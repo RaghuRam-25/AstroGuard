@@ -9,8 +9,14 @@ export interface AuthUser {
   id: string;
   name: string;
   email: string;
+  username?: string;
   role: UserRole;
   astronautId?: string;
+  phone?: string;
+  dateOfBirth?: string;
+  country?: string;
+  gender?: "female" | "male" | "non_binary" | "prefer_not_to_say";
+  profileImage?: string;
   assignedAstronautIds?: string[];
   missionIds?: string[];
   isActive?: boolean;

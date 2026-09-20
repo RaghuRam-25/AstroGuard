@@ -34,6 +34,7 @@ export default function AppLayout({ children }: AppLayoutProps) {
   const isBypassLayout =
     pathname === "/" ||
     pathname === "/login" ||
+    pathname === "/register" ||
     pathname === "/about" ||
     pathname === "/unauthorized" ||
     pathname.startsWith("/astronaut") ||

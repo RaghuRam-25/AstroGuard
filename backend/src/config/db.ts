@@ -1,8 +1,13 @@
 import mongoose from "mongoose";
+import dns from "node:dns";
 import { env } from "./env.js";
 
 export const connectDB = async (): Promise<typeof mongoose> => {
   try {
+    if (env.MONGODB_URI.startsWith("mongodb+srv://") && env.NODE_ENV !== "production") {
+      dns.setServers(["8.8.8.8", "1.1.1.1"]);
+    }
+
     const conn = await mongoose.connect(env.MONGODB_URI, {
       autoIndex: true,
       serverSelectionTimeoutMS: 5000,

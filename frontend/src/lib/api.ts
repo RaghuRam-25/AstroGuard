@@ -70,6 +70,25 @@ export const login = (email: string, password: string) =>
     body: JSON.stringify({ email, password }),
   });
 
+export const registerAstronaut = (data: {
+  name: string;
+  email: string;
+  username: string;
+  password: string;
+  confirmPassword: string;
+  phone: string;
+  dateOfBirth: string;
+  country: string;
+  gender?: "female" | "male" | "non_binary" | "prefer_not_to_say";
+  astronautId?: string;
+  profileImage?: string;
+  agreeToTerms: boolean;
+}) =>
+  apiRequest("/api/auth/register", {
+    method: "POST",
+    body: JSON.stringify(data),
+  });
+
 export const logout = () =>
   apiRequest("/api/auth/logout", { method: "POST" });
 

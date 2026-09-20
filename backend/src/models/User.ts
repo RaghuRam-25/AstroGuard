@@ -6,9 +6,15 @@ export type UserRole = "astronaut" | "medical_officer" | "mission_control" | "ad
 export interface IUser extends Document {
   name: string;
   email: string;
+  username?: string;
   passwordHash: string;
   role: UserRole;
   astronautId?: string;
+  phone?: string;
+  dateOfBirth?: Date;
+  country?: string;
+  gender?: "female" | "male" | "non_binary" | "prefer_not_to_say";
+  profileImage?: string;
   assignedAstronautIds?: string[];
   missionIds?: string[];
   isActive: boolean;
@@ -32,6 +38,17 @@ const UserSchema: Schema = new Schema(
       trim: true,
       index: true,
     },
+    username: {
+      type: String,
+      unique: true,
+      sparse: true,
+      lowercase: true,
+      trim: true,
+      minlength: 3,
+      maxlength: 30,
+      match: [/^[a-zA-Z0-9_]+$/, "Username may only contain letters, numbers, and underscores"],
+      index: true,
+    },
     passwordHash: {
       type: String,
       required: [true, "Password hash is required"],
@@ -47,6 +64,25 @@ const UserSchema: Schema = new Schema(
       type: String,
       trim: true,
       index: true,
+    },
+    phone: {
+      type: String,
+      trim: true,
+    },
+    dateOfBirth: {
+      type: Date,
+    },
+    country: {
+      type: String,
+      trim: true,
+    },
+    gender: {
+      type: String,
+      enum: ["female", "male", "non_binary", "prefer_not_to_say"],
+    },
+    profileImage: {
+      type: String,
+      trim: true,
     },
     assignedAstronautIds: {
       type: [String],

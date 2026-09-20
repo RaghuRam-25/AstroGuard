@@ -14,8 +14,14 @@ const formatUserResponse = (user: IUser) => ({
   id: user._id.toString(),
   name: user.name,
   email: user.email,
+  username: user.username,
   role: user.role,
   astronautId: user.astronautId,
+  phone: user.phone,
+  dateOfBirth: user.dateOfBirth,
+  country: user.country,
+  gender: user.gender,
+  profileImage: user.profileImage,
   assignedAstronautIds: user.assignedAstronautIds,
   missionIds: user.missionIds,
   isActive: user.isActive,
@@ -29,12 +35,28 @@ export class AuthController {
    */
   public static async register(req: Request, res: Response, next: NextFunction) {
     try {
-      const { name, email, password, astronautId } = req.body;
+      const {
+        name,
+        email,
+        username,
+        password,
+        astronautId,
+        phone,
+        dateOfBirth,
+        country,
+        gender,
+        profileImage,
+      } = req.body;
 
       // Check if email already registered
       const existing = await User.findOne({ email: email.toLowerCase() });
       if (existing) {
         return errorResponse(res, "An account with this email already exists.", 409);
+      }
+
+      const existingUsername = await User.findOne({ username: username.toLowerCase() });
+      if (existingUsername) {
+        return errorResponse(res, "This username is already taken.", 409);
       }
 
       // Hash password
@@ -45,9 +67,15 @@ export class AuthController {
       const user = await User.create({
         name,
         email: email.toLowerCase(),
+        username: username.toLowerCase(),
         passwordHash,
         role: "astronaut",
         astronautId: astronautId || undefined,
+        phone,
+        dateOfBirth: new Date(dateOfBirth),
+        country,
+        gender: gender || undefined,
+        profileImage: profileImage || undefined,
         isActive: true,
       });
 

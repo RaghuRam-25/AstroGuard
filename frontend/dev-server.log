@@ -1,0 +1,15 @@
+
+> frontend@0.1.0 dev
+> next dev
+
+▲ Next.js 16.3.5 (Turbopack)
+- Local:         http://localhost:3000
+- Network:       http://192.168.92.1:3000
+- Environments: .env.local
+✓ Ready in 896ms
+✓ Running next.config.ts took 76ms
+Creating turbopack project { dir: 'E:\\Project\\NASA Space App\\frontend', testMode: true }
+
+/*! 🌼 daisyUI 5.7.42 */
+ GET /register 200 in 2.7s (next.js: 2.3s, proxy.ts: 141ms, application-code: 229ms)
+ GET /register 200 in 164ms (next.js: 92ms, proxy.ts: 8ms, application-code: 64ms)
