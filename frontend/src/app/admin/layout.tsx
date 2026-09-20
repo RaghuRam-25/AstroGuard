@@ -5,6 +5,8 @@ import Image from "next/image";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
 import { useAuth } from "../../context/AuthContext";
+import ProtectedRoute from "../../components/auth/ProtectedRoute";
+import RoleGuard from "../../components/auth/RoleGuard";
 import {
   LayoutDashboard,
   Users,
@@ -33,6 +35,8 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   const [mobileOpen, setMobileOpen] = useState(false);
 
   return (
+    <ProtectedRoute>
+      <RoleGuard allowedRoles={["admin"]}>
     <div className="flex min-h-screen bg-[#0a0800] text-white">
       {/* Desktop Sidebar — amber/orange accent (administrative) */}
       <aside className="hidden lg:flex w-64 flex-col justify-between border-r border-amber-500/10 bg-[#150f00]/95 p-5 shrink-0 fixed top-0 bottom-0 left-0 z-40 backdrop-blur-md">
@@ -132,5 +136,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         <main className="flex-1 p-4 sm:p-6 lg:p-8">{children}</main>
       </div>
     </div>
+      </RoleGuard>
+    </ProtectedRoute>
   );
 }

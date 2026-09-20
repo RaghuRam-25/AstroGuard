@@ -48,8 +48,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   // Fetch current authenticated user on app initialization
   const refreshUser = useCallback(async () => {
+    setLoading(true);
     try {
-      const res = await apiRequest<{ user: AuthUser }>("/api/auth/me");
+      let res = await apiRequest<{ user: AuthUser }>("/api/auth/me");
+      if (!res.success && res.status === 401) {
+        const refreshRes = await apiRequest<{ user: AuthUser }>("/api/auth/refresh", {
+          method: "POST",
+        });
+        if (refreshRes.success && refreshRes.data?.user) {
+          res = refreshRes;
+        }
+      }
+
       if (res.success && res.data?.user) {
         setUser(res.data.user);
       } else {

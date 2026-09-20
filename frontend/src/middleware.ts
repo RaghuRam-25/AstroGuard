@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
 
-// Role-to-route prefix mapping
 const ROLE_ROUTES: Record<string, string> = {
   astronaut: "/astronaut",
   medical_officer: "/medical",
@@ -8,18 +7,14 @@ const ROLE_ROUTES: Record<string, string> = {
   admin: "/admin",
 };
 
-// Protected route prefixes (require authentication)
 const PROTECTED_PREFIXES = ["/astronaut", "/medical", "/mission-control", "/admin"];
-
-// Public routes (no auth required)
-const PUBLIC_ROUTES = ["/", "/login", "/about", "/unauthorized"];
+const PUBLIC_ROUTES = ["/", "/login", "/register", "/about", "/unauthorized"];
 
 export function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
 
-  // Always allow public pages and Next.js internals
   if (
-    PUBLIC_ROUTES.some((p) => pathname === p) ||
+    PUBLIC_ROUTES.some((route) => pathname === route) ||
     pathname.startsWith("/_next") ||
     pathname.startsWith("/api") ||
     pathname.startsWith("/favicon") ||
@@ -29,35 +24,32 @@ export function middleware(req: NextRequest) {
     return NextResponse.next();
   }
 
-  // Check if this is a protected route
   const isProtected = PROTECTED_PREFIXES.some((prefix) => pathname.startsWith(prefix));
   if (!isProtected) {
     return NextResponse.next();
   }
 
-  // Read the access token cookie (set as HTTP-only by backend)
   const token = req.cookies.get("astro_token")?.value;
 
   if (!token) {
-    // Not authenticated — redirect to login
-    const loginUrl = req.nextUrl.clone();
-    loginUrl.pathname = "/login";
-    loginUrl.searchParams.set("redirect", pathname);
-    return NextResponse.redirect(loginUrl);
+    // On separate frontend/backend domains, the backend HTTP-only cookie is not
+    // visible here. Client guards call /api/auth/me and backend APIs enforce auth.
+    return NextResponse.next();
   }
 
-  // Decode JWT payload WITHOUT verification (verification happens on backend)
-  // This is only used for client-side routing decisions — backend enforces real auth
   try {
     const payloadBase64 = token.split(".")[1];
-    if (!payloadBase64) throw new Error("Invalid token");
+    if (!payloadBase64) {
+      return NextResponse.next();
+    }
+
     const payload = JSON.parse(atob(payloadBase64.replace(/-/g, "+").replace(/_/g, "/")));
-    const role: string = payload.role;
+    const allowedPrefix = ROLE_ROUTES[payload.role];
 
-    // Determine which prefix this user is allowed to access
-    const allowedPrefix = ROLE_ROUTES[role];
+    if (!allowedPrefix) {
+      return NextResponse.next();
+    }
 
-    // Check if they're trying to access a different role's section
     const isAccessingWrongRole = PROTECTED_PREFIXES.some(
       (prefix) => pathname.startsWith(prefix) && prefix !== allowedPrefix
     );
@@ -67,14 +59,11 @@ export function middleware(req: NextRequest) {
       unauthorizedUrl.pathname = "/unauthorized";
       return NextResponse.redirect(unauthorizedUrl);
     }
-
-    return NextResponse.next();
   } catch {
-    // Token malformed — redirect to login
-    const loginUrl = req.nextUrl.clone();
-    loginUrl.pathname = "/login";
-    return NextResponse.redirect(loginUrl);
+    return NextResponse.next();
   }
+
+  return NextResponse.next();
 }
 
 export const config = {

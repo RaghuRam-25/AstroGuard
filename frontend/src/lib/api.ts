@@ -15,7 +15,8 @@ export interface ApiResponse<T = any> {
 
 export async function apiRequest<T = any>(
   endpoint: string,
-  options: RequestInit = {}
+  options: RequestInit = {},
+  retryOnAuthFailure = true
 ): Promise<ApiResponse<T>> {
   const url = endpoint.startsWith("http") ? endpoint : `${API_BASE_URL}${endpoint}`;
 
@@ -32,6 +33,19 @@ export async function apiRequest<T = any>(
     });
 
     const data: ApiResponse<T> = await res.json();
+
+    if (
+      res.status === 401 &&
+      retryOnAuthFailure &&
+      endpoint !== "/api/auth/login" &&
+      endpoint !== "/api/auth/refresh" &&
+      endpoint !== "/api/auth/logout"
+    ) {
+      const refreshRes = await apiRequest("/api/auth/refresh", { method: "POST" }, false);
+      if (refreshRes.success) {
+        return apiRequest<T>(endpoint, options, false);
+      }
+    }
 
     if (!res.ok) {
       return {

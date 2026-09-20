@@ -14,6 +14,12 @@ export const connectDB = async (): Promise<typeof mongoose> => {
     });
 
     console.log(`🌌 MongoDB Connected: ${conn.connection.host}/${conn.connection.name}`);
+    if (conn.connection.name !== "AstroGuard") {
+      throw new Error(
+        `Connected database must be AstroGuard. Current database: ${conn.connection.name || "unknown"}`
+      );
+    }
+
     return conn;
   } catch (error) {
     console.error("❌ MongoDB Connection Error:", error);

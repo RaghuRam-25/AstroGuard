@@ -1,11 +1,35 @@
 "use client";
 
+import { useEffect } from "react";
 import Image from "next/image";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import LoginForm from "../../components/auth/LoginForm";
+import { useAuth } from "../../context/AuthContext";
+import { LoadingState } from "../../components/shared/LoadingState";
 import { Shield } from "lucide-react";
 
+const ROLE_REDIRECTS: Record<string, string> = {
+  astronaut: "/astronaut/dashboard",
+  medical_officer: "/medical/dashboard",
+  mission_control: "/mission-control/dashboard",
+  admin: "/admin/dashboard",
+};
+
 export default function LoginPage() {
+  const router = useRouter();
+  const { user, loading } = useAuth();
+
+  useEffect(() => {
+    if (!loading && user) {
+      router.replace(ROLE_REDIRECTS[user.role] || "/dashboard");
+    }
+  }, [loading, router, user]);
+
+  if (loading || user) {
+    return <LoadingState message="Verifying existing mission clearance..." />;
+  }
+
   return (
     <div className="min-h-screen bg-[#020817] flex flex-col justify-center py-12 px-4 sm:px-6 lg:px-8 relative overflow-hidden">
       {/* Background Neon Space Glows */}

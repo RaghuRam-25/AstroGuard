@@ -23,9 +23,13 @@ const app: Application = express();
 app.use(helmet());
 app.use(cookieParser());
 
-// CORS configuration (supports configured frontend URL + localhost)
+// CORS configuration (supports configured frontend URL + local Next.js dev)
+const configuredFrontendOrigins = env.FRONTEND_URL.split(",")
+  .map((origin) => origin.trim())
+  .filter(Boolean);
+
 const allowedOrigins = [
-  env.FRONTEND_URL,
+  ...configuredFrontendOrigins,
   "http://localhost:3000",
   "http://localhost:3001",
   "http://127.0.0.1:3000",
@@ -37,7 +41,7 @@ app.use(
       if (!origin || allowedOrigins.includes(origin)) {
         return callback(null, true);
       }
-      return callback(null, true); // Dev-friendly permissive fallback
+      return callback(new Error(`CORS blocked origin: ${origin}`));
     },
     credentials: true,
     methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
