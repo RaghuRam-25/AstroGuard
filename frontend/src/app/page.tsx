@@ -59,10 +59,16 @@ export default function HomePage() {
         {/* Right CTA Button */}
         <div className="flex items-center gap-3">
           <Link
-            href="/dashboard"
-            className="rounded-xl bg-blue-600 px-5 py-2 text-sm font-semibold text-white shadow-lg shadow-blue-600/30 hover:bg-blue-500 transition-all active:scale-95"
+            href="/login"
+            className="rounded-xl border border-white/15 bg-slate-950/40 px-4 py-2 text-sm font-semibold text-slate-200 transition-all hover:bg-slate-900/70 hover:text-white active:scale-95"
           >
             Sign In
+          </Link>
+          <Link
+            href="/register"
+            className="rounded-xl bg-blue-600 px-5 py-2 text-sm font-semibold text-white shadow-lg shadow-blue-600/30 transition-all hover:bg-blue-500 active:scale-95"
+          >
+            Register
           </Link>
         </div>
       </header>
@@ -88,16 +94,16 @@ export default function HomePage() {
           {/* CTAs */}
           <div className="flex flex-wrap items-center gap-4 pt-2">
             <Link
-              href="/dashboard"
+              href="/register"
               className="rounded-xl bg-blue-600 px-7 py-3.5 text-sm font-semibold text-white shadow-xl shadow-blue-600/35 hover:bg-blue-500 transition-all active:scale-95"
             >
-              Get Started
+              Register Astronaut
             </Link>
             <Link
-              href="/ai-analysis"
+              href="/login"
               className="rounded-xl border border-white/20 bg-slate-950/40 px-7 py-3.5 text-sm font-semibold text-slate-200 hover:bg-slate-900/60 hover:text-white transition-all backdrop-blur-md"
             >
-              Learn More
+              Sign In
             </Link>
           </div>
 

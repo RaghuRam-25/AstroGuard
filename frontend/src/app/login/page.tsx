@@ -42,6 +42,16 @@ export default function LoginPage() {
           </div>
 
           <LoginForm />
+
+          <div className="border-t border-white/5 pt-5 text-center">
+            <p className="text-xs text-slate-400">New astronaut applicant?</p>
+            <Link
+              href="/register"
+              className="mt-3 inline-flex w-full items-center justify-center rounded-xl border border-blue-400/30 bg-blue-500/10 px-4 py-3 text-sm font-semibold text-blue-100 transition hover:border-blue-300/60 hover:bg-blue-500/20"
+            >
+              Create Astronaut Account
+            </Link>
+          </div>
         </div>
 
         <div className="mt-6 text-center text-xs text-slate-500">
