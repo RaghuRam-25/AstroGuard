@@ -102,12 +102,20 @@ export class AuthController {
   public static async login(req: Request, res: Response, next: NextFunction) {
     try {
       const { email, password } = req.body;
+      const identifier = String(email).trim();
+      const normalizedIdentifier = identifier.toLowerCase();
 
       // Find user with passwordHash
-      const user = await User.findOne({ email: email.toLowerCase() }).select("+passwordHash");
+      const user = await User.findOne({
+        $or: [
+          { email: normalizedIdentifier },
+          { username: normalizedIdentifier },
+          { astronautId: identifier },
+        ],
+      }).select("+passwordHash");
       if (!user) {
         // Generic message for security
-        return errorResponse(res, "Invalid email or password credentials.", 401);
+        return errorResponse(res, "Invalid login ID or password credentials.", 401);
       }
 
       if (!user.isActive) {
@@ -117,7 +125,7 @@ export class AuthController {
       // Compare password
       const isMatch = await user.comparePassword(password);
       if (!isMatch) {
-        return errorResponse(res, "Invalid email or password credentials.", 401);
+        return errorResponse(res, "Invalid login ID or password credentials.", 401);
       }
 
       // Generate Tokens & Cookies

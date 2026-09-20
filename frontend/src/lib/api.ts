@@ -64,10 +64,10 @@ export async function apiRequest<T = any>(
 //  Auth
 // ─────────────────────────────────────────────────────────
 
-export const login = (email: string, password: string) =>
+export const login = (loginId: string, password: string) =>
   apiRequest("/api/auth/login", {
     method: "POST",
-    body: JSON.stringify({ email, password }),
+    body: JSON.stringify({ email: loginId, password }),
   });
 
 export const registerAstronaut = (data: {

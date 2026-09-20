@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "../../context/AuthContext";
-import { Lock, Mail, Loader2, AlertCircle, Sparkles, ShieldCheck } from "lucide-react";
+import { Lock, IdCard, Loader2, AlertCircle, Sparkles, ShieldCheck } from "lucide-react";
 
 const ROLE_REDIRECTS: Record<string, string> = {
   astronaut: "/astronaut/dashboard",
@@ -16,7 +16,7 @@ export default function LoginForm() {
   const router = useRouter();
   const { login } = useAuth();
 
-  const [email, setEmail] = useState("");
+  const [loginId, setLoginId] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -53,7 +53,7 @@ export default function LoginForm() {
   ];
 
   const handleSelectDemo = (acc: (typeof demoAccounts)[0]) => {
-    setEmail(acc.email);
+    setLoginId(acc.email);
     setPassword(acc.password);
     setErrorMessage(null);
   };
@@ -64,15 +64,15 @@ export default function LoginForm() {
     setLoading(true);
 
     try {
-      const res = await login(email, password);
+      const res = await login(loginId, password);
       if (res.success && res.user) {
         const dest = ROLE_REDIRECTS[res.user.role] || "/dashboard";
         router.push(dest);
       } else {
         setErrorMessage(res.message || "Invalid credentials.");
       }
-    } catch (err: any) {
-      setErrorMessage(err.message || "An unexpected error occurred.");
+    } catch (err: unknown) {
+      setErrorMessage(err instanceof Error ? err.message : "An unexpected error occurred.");
     } finally {
       setLoading(false);
     }
@@ -92,15 +92,16 @@ export default function LoginForm() {
 
       <form onSubmit={handleSubmit} className="space-y-4">
         <div className="space-y-1.5">
-          <label className="text-xs font-semibold text-slate-300">Mission Email</label>
+          <label className="text-xs font-semibold text-slate-300">Email, Username, or Astronaut ID</label>
           <div className="relative">
-            <Mail className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+            <IdCard className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
             <input
-              type="email"
+              type="text"
               required
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              placeholder="astronaut@astroguard.local"
+              value={loginId}
+              onChange={(e) => setLoginId(e.target.value)}
+              placeholder="email, username, or AST-2026-001"
+              autoComplete="username"
               className="w-full rounded-xl border border-white/10 bg-[#020817] py-2.5 pl-10 pr-4 text-sm text-white placeholder-slate-500 outline-none focus:border-blue-500 transition"
             />
           </div>

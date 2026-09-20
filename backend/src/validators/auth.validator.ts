@@ -46,7 +46,7 @@ export const registerSchema = z.object({
 
 export const loginSchema = z.object({
   body: z.object({
-    email: z.string().email("Invalid email address").toLowerCase().trim(),
+    email: z.string().min(1, "Email, username, or astronaut ID is required").trim(),
     password: z.string().min(1, "Password is required"),
   }),
 });
