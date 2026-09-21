@@ -1,23 +1,55 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { getMissionCrew, getMissionAlerts } from "../../../../lib/api";
 import { LoadingState, ErrorState, EmptyState } from "../../../../components/shared/LoadingState";
-import { ArrowLeft, Rocket, Users, ShieldAlert, Activity, AlertTriangle, CheckCircle2, RefreshCw } from "lucide-react";
+import { ArrowLeft, Users, ShieldAlert, RefreshCw } from "lucide-react";
+
+interface MissionCrewMember {
+  astronautId: string;
+  name: string;
+  role: string;
+  latestHealth?: {
+    heartRate?: number;
+    spo2?: number;
+    activity?: number;
+  };
+  latestAnalysis?: {
+    riskLevel?: string;
+  };
+}
+
+interface MissionAlert {
+  _id?: string;
+  id?: string;
+  astronautId?: string;
+  type: string;
+  message: string;
+  severity: string;
+  resolved?: boolean;
+  createdAt?: string;
+}
+
+interface MissionInfo {
+  name?: string;
+  missionId?: string;
+  status?: string;
+  missionDay?: number;
+}
 
 export default function MissionControlMissionDetailPage() {
   const params = useParams();
   const missionId = decodeURIComponent((params?.id as string) || "");
 
-  const [crew, setCrew] = useState<any[]>([]);
-  const [alerts, setAlerts] = useState<any[]>([]);
-  const [missionInfo, setMissionInfo] = useState<any>(null);
+  const [crew, setCrew] = useState<MissionCrewMember[]>([]);
+  const [alerts, setAlerts] = useState<MissionAlert[]>([]);
+  const [missionInfo, setMissionInfo] = useState<MissionInfo | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const fetchDetail = async () => {
+  const fetchDetail = useCallback(async () => {
     if (!missionId) return;
     setLoading(true);
     setError(null);
@@ -28,22 +60,23 @@ export default function MissionControlMissionDetailPage() {
       ]);
 
       if (crewRes.success && crewRes.data) {
-        setCrew(crewRes.data.crew || []);
-        setMissionInfo(crewRes.data.mission);
+        setCrew((crewRes.data as { crew?: MissionCrewMember[] }).crew || []);
+        setMissionInfo((crewRes.data as { mission?: MissionInfo }).mission || null);
       }
       if (alertsRes.success && alertsRes.data) {
-        setAlerts(alertsRes.data.alerts || alertsRes.data || []);
+        const data = alertsRes.data as { alerts?: MissionAlert[] } | MissionAlert[];
+        setAlerts(Array.isArray(data) ? data : data.alerts || []);
       }
-    } catch (err: any) {
-      setError(err.message || "Failed to load mission operations console.");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to load mission operations console.");
     } finally {
       setLoading(false);
     }
-  };
+  }, [missionId]);
 
   useEffect(() => {
-    fetchDetail();
-  }, [missionId]);
+    void Promise.resolve().then(() => fetchDetail());
+  }, [missionId, fetchDetail]);
 
   if (loading) return <LoadingState message={`Uplinking to ${missionId} operational deck...`} />;
   if (error) return <ErrorState message={error} onRetry={fetchDetail} />;
@@ -152,7 +185,7 @@ export default function MissionControlMissionDetailPage() {
           <EmptyState title="All Nominal" message="No operational alerts flagged for this flight mission." />
         ) : (
           <div className="space-y-2">
-            {alerts.map((a: any) => (
+            {alerts.map((a) => (
               <div
                 key={a._id || a.id}
                 className="p-4 rounded-xl border border-white/5 bg-[#0e061c] flex items-center justify-between text-xs"

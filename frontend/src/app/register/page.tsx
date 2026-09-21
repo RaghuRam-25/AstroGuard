@@ -12,7 +12,6 @@ import {
   EyeOff,
   Fingerprint,
   Globe2,
-  IdCard,
   Loader2,
   Lock,
   Mail,
@@ -31,12 +30,10 @@ type FormState = {
   email: string;
   username: string;
   password: string;
-  confirmPassword: string;
   phone: string;
   dateOfBirth: string;
   country: string;
   gender: GenderValue;
-  astronautId: string;
   profileImage: string;
   agreeToTerms: boolean;
 };
@@ -46,12 +43,10 @@ const initialForm: FormState = {
   email: "",
   username: "",
   password: "",
-  confirmPassword: "",
   phone: "",
   dateOfBirth: "",
   country: "",
   gender: "",
-  astronautId: "",
   profileImage: "",
   agreeToTerms: false,
 };
@@ -61,6 +56,202 @@ const passwordRules = [
   { label: "Uppercase", test: (value: string) => /[A-Z]/.test(value) },
   { label: "Lowercase", test: (value: string) => /[a-z]/.test(value) },
   { label: "Number", test: (value: string) => /[0-9]/.test(value) },
+];
+
+const COUNTRIES = [
+  "Afghanistan",
+  "Albania",
+  "Algeria",
+  "Andorra",
+  "Angola",
+  "Antigua and Barbuda",
+  "Argentina",
+  "Armenia",
+  "Australia",
+  "Austria",
+  "Azerbaijan",
+  "Bahamas",
+  "Bahrain",
+  "Bangladesh",
+  "Barbados",
+  "Belarus",
+  "Belgium",
+  "Belize",
+  "Benin",
+  "Bhutan",
+  "Bolivia",
+  "Bosnia and Herzegovina",
+  "Botswana",
+  "Brazil",
+  "Brunei",
+  "Bulgaria",
+  "Burkina Faso",
+  "Burundi",
+  "Cabo Verde",
+  "Cambodia",
+  "Cameroon",
+  "Canada",
+  "Central African Republic",
+  "Chad",
+  "Chile",
+  "China",
+  "Colombia",
+  "Comoros",
+  "Congo",
+  "Costa Rica",
+  "Croatia",
+  "Cuba",
+  "Cyprus",
+  "Czech Republic",
+  "Denmark",
+  "Djibouti",
+  "Dominica",
+  "Dominican Republic",
+  "Ecuador",
+  "Egypt",
+  "El Salvador",
+  "Equatorial Guinea",
+  "Eritrea",
+  "Estonia",
+  "Eswatini",
+  "Ethiopia",
+  "Fiji",
+  "Finland",
+  "France",
+  "Gabon",
+  "Gambia",
+  "Georgia",
+  "Germany",
+  "Ghana",
+  "Greece",
+  "Grenada",
+  "Guatemala",
+  "Guinea",
+  "Guinea-Bissau",
+  "Guyana",
+  "Haiti",
+  "Honduras",
+  "Hungary",
+  "Iceland",
+  "India",
+  "Indonesia",
+  "Iran",
+  "Iraq",
+  "Ireland",
+  "Israel",
+  "Italy",
+  "Jamaica",
+  "Japan",
+  "Jordan",
+  "Kazakhstan",
+  "Kenya",
+  "Kiribati",
+  "Kuwait",
+  "Kyrgyzstan",
+  "Laos",
+  "Latvia",
+  "Lebanon",
+  "Lesotho",
+  "Liberia",
+  "Libya",
+  "Liechtenstein",
+  "Lithuania",
+  "Luxembourg",
+  "Madagascar",
+  "Malawi",
+  "Malaysia",
+  "Maldives",
+  "Mali",
+  "Malta",
+  "Marshall Islands",
+  "Mauritania",
+  "Mauritius",
+  "Mexico",
+  "Micronesia",
+  "Moldova",
+  "Monaco",
+  "Mongolia",
+  "Montenegro",
+  "Morocco",
+  "Mozambique",
+  "Myanmar",
+  "Namibia",
+  "Nauru",
+  "Nepal",
+  "Netherlands",
+  "New Zealand",
+  "Nicaragua",
+  "Niger",
+  "Nigeria",
+  "North Korea",
+  "North Macedonia",
+  "Norway",
+  "Oman",
+  "Pakistan",
+  "Palau",
+  "Palestine",
+  "Panama",
+  "Papua New Guinea",
+  "Paraguay",
+  "Peru",
+  "Philippines",
+  "Poland",
+  "Portugal",
+  "Qatar",
+  "Romania",
+  "Russia",
+  "Rwanda",
+  "Saint Kitts and Nevis",
+  "Saint Lucia",
+  "Saint Vincent and the Grenadines",
+  "Samoa",
+  "San Marino",
+  "Saudi Arabia",
+  "Senegal",
+  "Serbia",
+  "Seychelles",
+  "Sierra Leone",
+  "Singapore",
+  "Slovakia",
+  "Slovenia",
+  "Solomon Islands",
+  "Somalia",
+  "South Africa",
+  "South Korea",
+  "South Sudan",
+  "Spain",
+  "Sri Lanka",
+  "Sudan",
+  "Suriname",
+  "Sweden",
+  "Switzerland",
+  "Syria",
+  "Taiwan",
+  "Tajikistan",
+  "Tanzania",
+  "Thailand",
+  "Timor-Leste",
+  "Togo",
+  "Tonga",
+  "Trinidad and Tobago",
+  "Tunisia",
+  "Turkey",
+  "Turkmenistan",
+  "Tuvalu",
+  "Uganda",
+  "Ukraine",
+  "United Arab Emirates",
+  "United Kingdom",
+  "United States",
+  "Uruguay",
+  "Uzbekistan",
+  "Vanuatu",
+  "Vatican City",
+  "Venezuela",
+  "Vietnam",
+  "Yemen",
+  "Zambia",
+  "Zimbabwe",
 ];
 
 const inputBase =
@@ -76,7 +267,6 @@ export default function AstronautRegisterPage() {
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
-  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
   const passedRules = useMemo(
     () => passwordRules.filter((rule) => rule.test(form.password)).length,
@@ -109,9 +299,6 @@ export default function AstronautRegisterPage() {
     }
     if (passedRules < passwordRules.length) {
       nextErrors.password = "Password must meet all strength requirements.";
-    }
-    if (form.password !== form.confirmPassword) {
-      nextErrors.confirmPassword = "Passwords do not match.";
     }
     if (form.phone.trim().length < 7) nextErrors.phone = "Phone number is required.";
     if (!form.dateOfBirth) nextErrors.dateOfBirth = "Date of birth is required.";
@@ -170,12 +357,11 @@ export default function AstronautRegisterPage() {
         email: form.email.trim().toLowerCase(),
         username: form.username.trim().toLowerCase(),
         password: form.password,
-        confirmPassword: form.confirmPassword,
+        confirmPassword: form.password,
         phone: form.phone.trim(),
         dateOfBirth: form.dateOfBirth,
         country: form.country.trim(),
         gender: form.gender || undefined,
-        astronautId: form.astronautId.trim() || undefined,
         profileImage: form.profileImage || undefined,
         agreeToTerms: form.agreeToTerms,
       });
@@ -186,9 +372,9 @@ export default function AstronautRegisterPage() {
         return;
       }
 
-      setSuccessMessage("Registration successful. Launching your astronaut dashboard...");
+      setSuccessMessage("Registration successful. Redirecting to your mission portal...");
       setForm(initialForm);
-      setTimeout(() => router.push("/astronaut/dashboard"), 900);
+      setTimeout(() => router.push("/login"), 900);
     } catch (error: unknown) {
       setSubmitMessage(
         error instanceof Error ? error.message : "Unexpected registration error."
@@ -231,6 +417,15 @@ export default function AstronautRegisterPage() {
         <section className="grid flex-1 items-center gap-8 py-8 lg:grid-cols-[0.82fr_1.18fr] lg:py-10">
           <aside className="hidden lg:block">
             <div className="max-w-md space-y-7">
+              <div className="overflow-hidden rounded-3xl border border-blue-400/25 shadow-2xl shadow-blue-500/10">
+                <Image
+                  src="/astronaut-avatar.png"
+                  alt="Astronaut avatar"
+                  width={640}
+                  height={640}
+                  className="aspect-square w-full max-w-[19rem] object-cover"
+                />
+              </div>
               <div className="inline-flex items-center gap-2 rounded-full border border-emerald-400/30 bg-emerald-400/10 px-3 py-1 text-xs font-semibold text-emerald-300">
                 <span className="h-1.5 w-1.5 rounded-full bg-emerald-300" />
                 Public Astronaut Enrollment
@@ -346,22 +541,17 @@ export default function AstronautRegisterPage() {
                   </div>
                 </Field>
 
-                <Field label="Confirm Password" error={errors.confirmPassword}>
-                  <PasswordInput
-                    value={form.confirmPassword}
-                    onChange={(value) => updateField("confirmPassword", value)}
-                    visible={showConfirmPassword}
-                    onToggle={() => setShowConfirmPassword((current) => !current)}
-                    autoComplete="new-password"
-                  />
-                </Field>
-
                 <Field label="Date of Birth" error={errors.dateOfBirth}>
                   <IconInput icon={Calendar} type="date" value={form.dateOfBirth} onChange={(value) => updateField("dateOfBirth", value)} />
                 </Field>
 
-                <Field label="Country" error={errors.country}>
-                  <IconInput icon={Globe2} value={form.country} onChange={(value) => updateField("country", value)} placeholder="United States" autoComplete="country-name" />
+<Field label="Country" error={errors.country}>
+                  <IconInput icon={Globe2} list="country-list" value={form.country} onChange={(value) => updateField("country", value)} placeholder="United States" autoComplete="country-name" />
+                  <datalist id="country-list">
+                    {COUNTRIES.map((country) => (
+                      <option key={country} value={country} />
+                    ))}
+                  </datalist>
                 </Field>
 
                 <Field label="Gender" error={errors.gender}>
@@ -379,10 +569,6 @@ export default function AstronautRegisterPage() {
                       <option value="prefer_not_to_say">Prefer not to say</option>
                     </select>
                   </div>
-                </Field>
-
-                <Field label="Astronaut ID / Application ID" error={errors.astronautId}>
-                  <IconInput icon={IdCard} value={form.astronautId} onChange={(value) => updateField("astronautId", value)} placeholder="AST-2026-001" />
                 </Field>
               </div>
 
@@ -472,6 +658,7 @@ function IconInput({
   type = "text",
   placeholder,
   autoComplete,
+  list,
 }: {
   icon: React.ComponentType<{ className?: string }>;
   value: string;
@@ -479,6 +666,7 @@ function IconInput({
   type?: string;
   placeholder?: string;
   autoComplete?: string;
+  list?: string;
 }) {
   return (
     <div className="relative">
@@ -489,6 +677,7 @@ function IconInput({
         onChange={(event) => onChange(event.target.value)}
         placeholder={placeholder}
         autoComplete={autoComplete}
+        list={list}
         className={iconInputBase}
       />
     </div>

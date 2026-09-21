@@ -8,22 +8,47 @@ import { LoadingState, ErrorState, EmptyState } from "../../../components/shared
 import {
   Users,
   ShieldAlert,
-  HeartPulse,
-  Activity,
   Search,
-  ArrowRight,
   AlertTriangle,
   CheckCircle2,
   Stethoscope,
-  Filter,
   RefreshCw,
   Eye,
 } from "lucide-react";
 
+interface CrewMember {
+  astronautId: string;
+  name: string;
+  role?: string;
+  mission?: string;
+  unresolvedAlerts: number;
+  latestHealth?: {
+    heartRate: number;
+    spo2: number;
+    sleep: number;
+    activity: number;
+  };
+  latestAnalysis?: {
+    riskLevel?: string;
+    anomalyScore?: number;
+  };
+}
+
+interface MedicalAlert {
+  _id?: string;
+  id?: string;
+  astronautId: string;
+  type: string;
+  message: string;
+  severity: string;
+  resolved?: boolean;
+  createdAt?: string;
+}
+
 export default function MedicalDashboardPage() {
   const { user } = useAuth();
-  const [crew, setCrew] = useState<any[]>([]);
-  const [alerts, setAlerts] = useState<any[]>([]);
+  const [crew, setCrew] = useState<CrewMember[]>([]);
+  const [alerts, setAlerts] = useState<MedicalAlert[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
@@ -39,20 +64,20 @@ export default function MedicalDashboardPage() {
       ]);
 
       if (crewRes.success && crewRes.data) {
-        setCrew(crewRes.data.crew || []);
+        setCrew((crewRes.data as { crew?: CrewMember[] }).crew || []);
       }
       if (alertsRes.success && alertsRes.data) {
-        setAlerts(alertsRes.data || []);
+        setAlerts((alertsRes.data || []) as MedicalAlert[]);
       }
-    } catch (err: any) {
-      setError(err.message || "Failed to load medical dashboard.");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to load medical dashboard.");
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
-    fetchData();
+    void Promise.resolve().then(() => fetchData());
   }, []);
 
   if (loading) return <LoadingState message="Connecting to crew clinical bio-telemetry..." />;

@@ -1,6 +1,72 @@
 @import "tailwindcss";
 @plugin "daisyui";
 
+@theme {
+  --font-sans:
+    Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+    sans-serif;
+
+  --color-background: #020817;
+  --color-sidebar: #061426;
+  --color-card: #071a2e;
+  --color-card-secondary: #0b1f36;
+  --color-border-accent: #38bdf8;
+
+  --color-primary: #38bdf8;
+  --color-cyan-bright: #22d3ee;
+  --color-success: #22c55e;
+  --color-warning: #f59e0b;
+  --color-danger: #ef4444;
+
+  --color-foreground: #f8fafc;
+  --color-muted: #94a3b8;
+
+  --animate-fade-in: fade-in 0.55s ease-out both;
+  --animate-fade-in-up: fade-in-up 0.6s ease-out both;
+  --animate-pulse-soft: pulse-soft 2.4s ease-in-out infinite;
+  --animate-glow-pulse: glow-pulse 2.6s ease-in-out infinite;
+
+  @keyframes fade-in {
+    from {
+      opacity: 0;
+    }
+    to {
+      opacity: 1;
+    }
+  }
+
+  @keyframes fade-in-up {
+    from {
+      opacity: 0;
+      transform: translateY(8px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  @keyframes pulse-soft {
+    0%,
+    100% {
+      opacity: 1;
+    }
+    50% {
+      opacity: 0.45;
+    }
+  }
+
+  @keyframes glow-pulse {
+    0%,
+    100% {
+      box-shadow: 0 0 0 0 rgba(56, 189, 248, 0.25);
+    }
+    50% {
+      box-shadow: 0 0 18px 2px rgba(56, 189, 248, 0.35);
+    }
+  }
+}
+
 * {
   box-sizing: border-box;
 }
@@ -12,8 +78,8 @@ html {
 body {
   margin: 0;
   min-width: 320px;
-  background-color: #070b13;
-  color: #f1f5f9;
+  background-color: #020817;
+  color: #f8fafc;
   font-family:
     Inter,
     system-ui,
@@ -24,6 +90,11 @@ body {
     sans-serif;
   overflow-x: hidden;
   -webkit-font-smoothing: antialiased;
+  background-image:
+    radial-gradient(ellipse 60% 45% at 78% -5%, rgba(56, 189, 248, 0.09), transparent 70%),
+    radial-gradient(ellipse 45% 35% at 12% 110%, rgba(34, 211, 238, 0.07), transparent 70%),
+    radial-gradient(ellipse 50% 40% at 50% 50%, rgba(7, 26, 46, 0.32), transparent 75%);
+  background-attachment: fixed;
 }
 
 /* Custom scrollbar */
@@ -33,7 +104,7 @@ body {
 }
 
 ::-webkit-scrollbar-track {
-  background: #070b13;
+  background: #020817;
 }
 
 ::-webkit-scrollbar-thumb {
@@ -43,4 +114,35 @@ body {
 
 ::-webkit-scrollbar-thumb:hover {
   background: #334155;
+}
+
+/* Futuristic glass card surface (subtle glassmorphism) */
+@utility glass-card {
+  background: rgba(7, 26, 51, 0.75);
+  border: 1px solid rgba(56, 189, 248, 0.12);
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.25);
+  backdrop-filter: blur(10px);
+}
+
+@utility card-surface {
+  background: rgba(7, 26, 46, 0.78);
+}
+
+/* Futuristic scanner beam (CBC Scanner mode) */
+@keyframes scan-beam {
+  0% {
+    top: 10%;
+    opacity: 0.15;
+  }
+  50% {
+    opacity: 1;
+  }
+  100% {
+    top: 88%;
+    opacity: 0.15;
+  }
+}
+
+@utility animate-scan-beam {
+  animation: scan-beam 3.4s ease-in-out infinite;
 }

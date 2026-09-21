@@ -4,10 +4,27 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { getMedicalCrew } from "../../../lib/api";
 import { LoadingState, ErrorState, EmptyState } from "../../../components/shared/LoadingState";
-import { Users, Search, Eye, Activity, Heart, Droplet, Moon, RefreshCw, ChevronRight } from "lucide-react";
+import { Search, RefreshCw, ChevronRight } from "lucide-react";
+
+interface CrewMember {
+  astronautId: string;
+  name: string;
+  role?: string;
+  mission?: string;
+  unresolvedAlerts: number;
+  latestHealth?: {
+    heartRate?: number;
+    spo2?: number;
+    sleep?: number;
+    activity?: number;
+  };
+  latestAnalysis?: {
+    riskLevel?: string;
+  };
+}
 
 export default function MedicalAstronautsPage() {
-  const [crew, setCrew] = useState<any[]>([]);
+  const [crew, setCrew] = useState<CrewMember[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState("");
@@ -18,17 +35,17 @@ export default function MedicalAstronautsPage() {
     try {
       const res = await getMedicalCrew();
       if (res.success && res.data) {
-        setCrew(res.data.crew || []);
+        setCrew((res.data as { crew?: CrewMember[] }).crew || []);
       }
-    } catch (err: any) {
-      setError(err.message || "Failed to load astronaut roster.");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to load astronaut roster.");
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
-    fetchCrew();
+    void Promise.resolve().then(() => fetchCrew());
   }, []);
 
   if (loading) return <LoadingState message="Retrieving clinical medical records..." />;

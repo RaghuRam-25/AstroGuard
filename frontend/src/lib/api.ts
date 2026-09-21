@@ -1,11 +1,11 @@
 export const API_BASE_URL =
   process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000";
 
-export interface ApiResponse<T = any> {
+export interface ApiResponse<T = unknown> {
   success: boolean;
   message?: string;
   data?: T;
-  errors?: any;
+  errors?: unknown;
   status?: number;
 }
 
@@ -13,7 +13,7 @@ export interface ApiResponse<T = any> {
 //  Core request helper
 // ─────────────────────────────────────────────────────────
 
-export async function apiRequest<T = any>(
+export async function apiRequest<T = unknown>(
   endpoint: string,
   options: RequestInit = {},
   retryOnAuthFailure = true
@@ -65,11 +65,14 @@ export async function apiRequest<T = any>(
     }
 
     return { ...data, status: res.status };
-  } catch (error: any) {
+  } catch (error: unknown) {
     return {
       success: false,
       status: 0,
-      message: error.message || "Network connection error. Is the backend server running?",
+      message:
+        error instanceof Error && error.message
+          ? error.message
+          : "Network connection error. Is the backend server running?",
     };
   }
 }
@@ -137,6 +140,14 @@ export const getMyAnalysisHistory = (astronautId: string) =>
 
 export const getMyAlerts = (astronautId: string) =>
   apiRequest(`/api/alerts/${astronautId}`);
+
+export const getAlerts = () => apiRequest("/api/alerts");
+
+export const markAlertRead = (id: number | string) =>
+  apiRequest(`/api/alerts/${id}/read`, { method: "PATCH" });
+
+export const resolveAlert = (id: number | string) =>
+  apiRequest(`/api/alerts/${id}/resolve`, { method: "POST" });
 
 export const submitHealthData = (data: {
   heartRate: number;
@@ -228,7 +239,7 @@ export const createAdminUser = (data: {
     body: JSON.stringify(data),
   });
 
-export const updateAdminUser = (id: string, data: Record<string, any>) =>
+export const updateAdminUser = (id: string, data: Record<string, unknown>) =>
   apiRequest(`/api/admin/users/${id}`, {
     method: "PUT",
     body: JSON.stringify(data),
@@ -249,13 +260,13 @@ export const updateUserRole = (id: string, role: string) =>
 export const getAdminMissions = () =>
   apiRequest("/api/admin/missions");
 
-export const createAdminMission = (data: Record<string, any>) =>
+export const createAdminMission = (data: Record<string, unknown>) =>
   apiRequest("/api/admin/missions", {
     method: "POST",
     body: JSON.stringify(data),
   });
 
-export const updateAdminMission = (id: string, data: Record<string, any>) =>
+export const updateAdminMission = (id: string, data: Record<string, unknown>) =>
   apiRequest(`/api/admin/missions/${id}`, {
     method: "PUT",
     body: JSON.stringify(data),
@@ -277,3 +288,46 @@ export const getAuditLogs = (params?: { limit?: number; page?: number; action?: 
 
 export const getSystemStatus = () =>
   apiRequest("/api/admin/system-status");
+
+// ─────────────────────────────────────────────────────────
+//  AI Analysis — astronaut assistant
+// ─────────────────────────────────────────────────────────
+
+export const postAnalysis = (payload: Record<string, unknown>) =>
+  apiRequest("/api/analysis", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+
+export const postAnalysisChat = (payload: Record<string, unknown>) =>
+  apiRequest("/api/analysis/chat", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+
+export async function postAnalysisVoice(payload: FormData): Promise<ApiResponse<unknown>> {
+  try {
+    const res = await fetch(`${API_BASE_URL}/api/analysis/voice`, {
+      method: "POST",
+      body: payload,
+      credentials: "include",
+    });
+    const data = (await res.json()) as ApiResponse<unknown>;
+    return { ...data, status: res.status };
+  } catch (error: unknown) {
+    return {
+      success: false,
+      status: 0,
+      message:
+        error instanceof Error && error.message
+          ? error.message
+          : "Network connection error. Is the backend server running?",
+    };
+  }
+}
+
+export const getLatestAnalysis = (astronautId: string) =>
+  apiRequest(`/api/analysis/${encodeURIComponent(astronautId)}/latest`);
+
+export const getAnalysisHistory = (astronautId: string) =>
+  apiRequest(`/api/analysis/${encodeURIComponent(astronautId)}/history`);

@@ -1,41 +1,52 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { getAstronautAlerts } from "../../../../../lib/api";
 import { LoadingState, ErrorState, EmptyState } from "../../../../../components/shared/LoadingState";
-import { ArrowLeft, Bell, AlertTriangle, CheckCircle2, Clock, RefreshCw } from "lucide-react";
+import { ArrowLeft, AlertTriangle, CheckCircle2, Clock, RefreshCw } from "lucide-react";
+
+interface MedicalAlert {
+  _id?: string;
+  id?: string;
+  astronautId: string;
+  type: string;
+  message: string;
+  severity: string;
+  resolved?: boolean;
+  createdAt?: string;
+}
 
 export default function MedicalAstronautAlertsPage() {
   const params = useParams();
   const astronautId = params?.id as string;
 
-  const [alerts, setAlerts] = useState<any[]>([]);
+  const [alerts, setAlerts] = useState<MedicalAlert[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const fetchAlerts = async () => {
+  const fetchAlerts = useCallback(async () => {
     if (!astronautId) return;
     setLoading(true);
     setError(null);
     try {
       const res = await getAstronautAlerts(astronautId);
       if (res.success && res.data) {
-        setAlerts(res.data || []);
+        setAlerts((res.data || []) as MedicalAlert[]);
       } else {
         setError(res.message || "Failed to load clinical alerts.");
       }
-    } catch (err: any) {
-      setError(err.message || "An unexpected error occurred.");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "An unexpected error occurred.");
     } finally {
       setLoading(false);
     }
-  };
+  }, [astronautId]);
 
   useEffect(() => {
-    fetchAlerts();
-  }, [astronautId]);
+    void Promise.resolve().then(() => fetchAlerts());
+  }, [astronautId, fetchAlerts]);
 
   if (loading) return <LoadingState message={`Reviewing alert history for ${astronautId}...`} />;
   if (error) return <ErrorState message={error} onRetry={fetchAlerts} />;
@@ -76,7 +87,7 @@ export default function MedicalAstronautAlertsPage() {
         <EmptyState title="No Active Alerts" message="No alerts registered for this astronaut." />
       ) : (
         <div className="space-y-3">
-          {alerts.map((alert: any) => {
+          {alerts.map((alert) => {
             const isCritical = alert.severity === "Critical";
             const dateStr = alert.createdAt ? new Date(alert.createdAt).toLocaleString() : "Just now";
 

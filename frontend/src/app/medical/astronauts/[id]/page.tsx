@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { getMedicalCrewMember } from "../../../../lib/api";
@@ -10,25 +10,46 @@ import {
   Droplet,
   Moon,
   Activity,
-  ShieldCheck,
-  AlertTriangle,
   ArrowLeft,
   Sparkles,
-  Bell,
-  Clock,
-  ExternalLink,
   RefreshCw,
 } from "lucide-react";
+
+interface AstronautDetail {
+  astronaut?: {
+    astronautId?: string;
+    name?: string;
+    role?: string;
+    mission?: string;
+    missionDay?: number;
+  };
+  latestHealth?: {
+    heartRate?: number;
+    spo2?: number;
+    sleep?: number;
+    activity?: number;
+  };
+  latestAnalysis?: {
+    riskLevel?: string;
+    anomalyScore?: number;
+    explanation?: {
+      headline?: string;
+      summary?: string;
+    };
+    recommendations?: string[];
+  };
+  unresolvedAlerts?: number;
+}
 
 export default function MedicalAstronautDetailPage() {
   const params = useParams();
   const astronautId = params?.id as string;
 
-  const [data, setData] = useState<any>(null);
+  const [data, setData] = useState<AstronautDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const fetchDetail = async () => {
+  const fetchDetail = useCallback(async () => {
     if (!astronautId) return;
     setLoading(true);
     setError(null);
@@ -39,21 +60,21 @@ export default function MedicalAstronautDetailPage() {
       } else {
         setError(res.message || "Failed to retrieve astronaut clinical profile.");
       }
-    } catch (err: any) {
-      setError(err.message || "An unexpected error occurred.");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "An unexpected error occurred.");
     } finally {
       setLoading(false);
     }
-  };
+  }, [astronautId]);
 
   useEffect(() => {
-    fetchDetail();
-  }, [astronautId]);
+    void Promise.resolve().then(() => fetchDetail());
+  }, [astronautId, fetchDetail]);
 
   if (loading) return <LoadingState message={`Accessing medical record for ${astronautId}...`} />;
   if (error) return <ErrorState message={error} onRetry={fetchDetail} />;
 
-  const { astronaut, latestHealth, latestAnalysis, unresolvedAlerts } = data || {};
+  const { astronaut, latestHealth, latestAnalysis, unresolvedAlerts } = data || ({} as AstronautDetail);
   const risk = latestAnalysis?.riskLevel || "Low";
   const isHighRisk = risk === "Critical" || risk === "Warning";
 
@@ -126,7 +147,7 @@ export default function MedicalAstronautDetailPage() {
           className="px-4 py-2 rounded-xl border border-white/5 bg-white/[0.02] hover:bg-white/[0.05] text-slate-300 text-xs font-semibold transition-colors flex items-center gap-1.5"
         >
           Alerts
-          {unresolvedAlerts > 0 && (
+          {(unresolvedAlerts || 0) > 0 && (
             <span className="h-2 w-2 rounded-full bg-red-400 animate-pulse" />
           )}
         </Link>

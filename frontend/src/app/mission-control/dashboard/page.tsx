@@ -1,55 +1,48 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
-import { useAuth } from "../../../context/AuthContext";
 import { getAssignedMissions, getMissionOverview } from "../../../lib/api";
-import { LoadingState, ErrorState, EmptyState } from "../../../components/shared/LoadingState";
+import { LoadingState, ErrorState } from "../../../components/shared/LoadingState";
 import {
   Rocket,
   Radio,
-  Users,
   ShieldAlert,
-  Activity,
-  AlertTriangle,
-  CheckCircle2,
-  Clock,
   ArrowRight,
   TrendingUp,
   RefreshCw,
-  Compass,
 } from "lucide-react";
 
+interface Mission {
+  _id?: string;
+  missionId?: string;
+  name: string;
+  status?: string;
+  missionDay?: number;
+  astronautIds?: string[];
+}
+
+interface Overview {
+  distribution?: Record<string, number>;
+  mission?: {
+    missionId?: string;
+    name?: string;
+    status?: string;
+    missionDay?: number;
+    astronautIds?: string[];
+  };
+  crewSize?: number;
+  activeAlerts?: number;
+}
+
 export default function MissionControlDashboardPage() {
-  const { user } = useAuth();
-  const [missions, setMissions] = useState<any[]>([]);
+  const [missions, setMissions] = useState<Mission[]>([]);
   const [selectedMissionId, setSelectedMissionId] = useState<string>("");
-  const [overview, setOverview] = useState<any>(null);
+  const [overview, setOverview] = useState<Overview | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const fetchMissions = async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const res = await getAssignedMissions();
-      if (res.success && res.data) {
-        const list = res.data.missions || [];
-        setMissions(list);
-        if (list.length > 0) {
-          const initialId = list[0].missionId || list[0].name;
-          setSelectedMissionId(initialId);
-          await loadMissionOverview(initialId);
-        }
-      }
-    } catch (err: any) {
-      setError(err.message || "Failed to load missions.");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const loadMissionOverview = async (mId: string) => {
+  const loadMissionOverview = useCallback(async (mId: string) => {
     try {
       const res = await getMissionOverview(mId);
       if (res.success && res.data) {
@@ -58,11 +51,32 @@ export default function MissionControlDashboardPage() {
     } catch (err) {
       console.error("Failed to load mission overview:", err);
     }
-  };
+  }, []);
+
+  const fetchMissions = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await getAssignedMissions();
+      if (res.success && res.data) {
+        const list = (res.data as { missions?: Mission[] }).missions || [];
+        setMissions(list);
+        if (list.length > 0) {
+          const initialId = list[0].missionId || list[0].name;
+          setSelectedMissionId(initialId);
+          await loadMissionOverview(initialId);
+        }
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to load missions.");
+    } finally {
+      setLoading(false);
+    }
+  }, [loadMissionOverview]);
 
   useEffect(() => {
-    fetchMissions();
-  }, []);
+    void Promise.resolve().then(() => fetchMissions());
+  }, [fetchMissions]);
 
   const handleSelectMission = async (id: string) => {
     setSelectedMissionId(id);

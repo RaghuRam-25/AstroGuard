@@ -2,28 +2,38 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { useAuth } from "../../../context/AuthContext";
 import { getSystemStatus, getAuditLogs } from "../../../lib/api";
 import { LoadingState, ErrorState } from "../../../components/shared/LoadingState";
 import {
   ShieldCheck,
   Users,
   Rocket,
-  ScrollText,
   AlertTriangle,
   Server,
-  CheckCircle2,
   ArrowRight,
   RefreshCw,
-  UserCheck,
-  Activity,
-  Lock,
 } from "lucide-react";
 
+interface AuditLog {
+  _id?: string;
+  id?: string;
+  action: string;
+  userEmail?: string;
+  resource: string;
+  resourceId?: string;
+  createdAt?: string;
+}
+
+interface SystemStatus {
+  users?: { total?: number; byRole?: Record<string, number> };
+  missions?: { total?: number };
+  alerts?: { unresolved?: number };
+  system?: { nodeVersion?: string };
+}
+
 export default function AdminDashboardPage() {
-  const { user } = useAuth();
-  const [status, setStatus] = useState<any>(null);
-  const [recentLogs, setRecentLogs] = useState<any[]>([]);
+  const [status, setStatus] = useState<SystemStatus | null>(null);
+  const [recentLogs, setRecentLogs] = useState<AuditLog[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -40,17 +50,17 @@ export default function AdminDashboardPage() {
         setStatus(statusRes.data);
       }
       if (logsRes.success && logsRes.data) {
-        setRecentLogs(logsRes.data.logs || []);
+        setRecentLogs((logsRes.data as { logs?: AuditLog[] }).logs || []);
       }
-    } catch (err: any) {
-      setError(err.message || "Failed to load administrative telemetry.");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to load administrative telemetry.");
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
-    fetchData();
+    void Promise.resolve().then(() => fetchData());
   }, []);
 
   if (loading) return <LoadingState message="Polling platform telemetry & security subsystems..." />;

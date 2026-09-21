@@ -1,26 +1,38 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { getAssignedMissions, getMissionAnalytics } from "../../../lib/api";
 import { LoadingState, ErrorState } from "../../../components/shared/LoadingState";
-import { BarChart3, TrendingUp, Users, ShieldAlert, CheckCircle2, RefreshCw } from "lucide-react";
+import { RefreshCw } from "lucide-react";
+
+interface Mission {
+  _id?: string;
+  missionId?: string;
+  name: string;
+}
+
+interface AnalyticsData {
+  distribution?: Record<string, number>;
+  averageAnomalyScore?: number;
+  totalCrew?: number;
+}
 
 export default function MissionControlAnalyticsPage() {
-  const [missions, setMissions] = useState<any[]>([]);
+  const [missions, setMissions] = useState<Mission[]>([]);
   const [selectedMission, setSelectedMission] = useState<string>("");
-  const [analytics, setAnalytics] = useState<any>(null);
+  const [analytics, setAnalytics] = useState<AnalyticsData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const fetchAnalytics = async () => {
+  const fetchAnalytics = useCallback(async (currentMission: string) => {
     setLoading(true);
     setError(null);
     try {
       const mRes = await getAssignedMissions();
       if (mRes.success && mRes.data) {
-        const mList = mRes.data.missions || [];
+        const mList = (mRes.data as { missions?: Mission[] }).missions || [];
         setMissions(mList);
-        const mId = selectedMission || mList[0]?.missionId || mList[0]?.name || "ARES-01";
+        const mId = currentMission || mList[0]?.missionId || mList[0]?.name || "ARES-01";
         setSelectedMission(mId);
 
         const aRes = await getMissionAnalytics(mId);
@@ -28,16 +40,16 @@ export default function MissionControlAnalyticsPage() {
           setAnalytics(aRes.data);
         }
       }
-    } catch (err: any) {
-      setError(err.message || "Failed to load mission analytics.");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to load mission analytics.");
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
-    fetchAnalytics();
-  }, []);
+    void Promise.resolve().then(() => fetchAnalytics(""));
+  }, [fetchAnalytics]);
 
   const handleSelectMission = async (id: string) => {
     setSelectedMission(id);
@@ -55,7 +67,7 @@ export default function MissionControlAnalyticsPage() {
   };
 
   if (loading) return <LoadingState message="Processing fleet-wide neural anomaly analytics..." />;
-  if (error) return <ErrorState message={error} onRetry={fetchAnalytics} />;
+  if (error) return <ErrorState message={error} onRetry={() => fetchAnalytics(selectedMission)} />;
 
   const dist = analytics?.distribution || { Normal: 3, Watch: 1, Warning: 0, Critical: 0 };
   const avgScore = analytics?.averageAnomalyScore != null ? `${Math.round(analytics.averageAnomalyScore * 100)}%` : "14%";
@@ -93,7 +105,7 @@ export default function MissionControlAnalyticsPage() {
           )}
 
           <button
-            onClick={fetchAnalytics}
+            onClick={() => fetchAnalytics(selectedMission)}
             className="flex items-center gap-2 px-3 py-1.5 rounded-lg border border-purple-500/20 bg-purple-500/10 text-xs font-medium text-purple-300 hover:bg-purple-500/20 transition-all"
           >
             <RefreshCw className="w-3.5 h-3.5" />

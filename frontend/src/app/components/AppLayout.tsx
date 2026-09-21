@@ -6,7 +6,6 @@ import Image from "next/image";
 import { useState } from "react";
 import { useAuth } from "../../context/AuthContext";
 import {
-  Home,
   LayoutDashboard,
   Activity,
   FileSpreadsheet,
@@ -27,7 +26,7 @@ interface AppLayoutProps {
 
 export default function AppLayout({ children }: AppLayoutProps) {
   const pathname = usePathname();
-  const { user, logout, loading } = useAuth();
+  const { user, logout } = useAuth();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
 

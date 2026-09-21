@@ -1,43 +1,61 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { getAssignedMissions, getMissionAlerts } from "../../../lib/api";
 import { LoadingState, ErrorState, EmptyState } from "../../../components/shared/LoadingState";
-import { ShieldAlert, AlertTriangle, CheckCircle2, Clock, RefreshCw } from "lucide-react";
+import { AlertTriangle, CheckCircle2, Clock, RefreshCw } from "lucide-react";
+
+interface Mission {
+  _id?: string;
+  missionId?: string;
+  name: string;
+}
+
+interface MissionAlert {
+  _id?: string;
+  id?: string;
+  astronautId?: string;
+  type: string;
+  message: string;
+  severity: string;
+  resolved?: boolean;
+  createdAt?: string;
+}
 
 export default function MissionControlAlertsPage() {
-  const [missions, setMissions] = useState<any[]>([]);
+  const [missions, setMissions] = useState<Mission[]>([]);
   const [selectedMission, setSelectedMission] = useState<string>("");
-  const [alerts, setAlerts] = useState<any[]>([]);
+  const [alerts, setAlerts] = useState<MissionAlert[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const fetchAlerts = async () => {
+  const fetchAlerts = useCallback(async (currentMission: string) => {
     setLoading(true);
     setError(null);
     try {
       const mRes = await getAssignedMissions();
       if (mRes.success && mRes.data) {
-        const mList = mRes.data.missions || [];
+        const mList = (mRes.data as { missions?: Mission[] }).missions || [];
         setMissions(mList);
-        const mId = selectedMission || mList[0]?.missionId || mList[0]?.name || "ARES-01";
+        const mId = currentMission || mList[0]?.missionId || mList[0]?.name || "ARES-01";
         setSelectedMission(mId);
 
         const aRes = await getMissionAlerts(mId);
         if (aRes.success && aRes.data) {
-          setAlerts(aRes.data.alerts || aRes.data || []);
+const data = aRes.data as { alerts?: MissionAlert[] } | MissionAlert[];
+          setAlerts(Array.isArray(data) ? data : data.alerts || []);
         }
       }
-    } catch (err: any) {
-      setError(err.message || "Failed to load mission alerts.");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to load mission alerts.");
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
-    fetchAlerts();
-  }, []);
+    void Promise.resolve().then(() => fetchAlerts(""));
+  }, [fetchAlerts]);
 
   const handleSelectMission = async (id: string) => {
     setSelectedMission(id);
@@ -45,7 +63,8 @@ export default function MissionControlAlertsPage() {
     try {
       const aRes = await getMissionAlerts(id);
       if (aRes.success && aRes.data) {
-        setAlerts(aRes.data.alerts || aRes.data || []);
+        const data = aRes.data as { alerts?: MissionAlert[] } | MissionAlert[];
+        setAlerts(Array.isArray(data) ? data : data.alerts || []);
       }
     } catch (err) {
       console.error(err);
@@ -55,7 +74,7 @@ export default function MissionControlAlertsPage() {
   };
 
   if (loading) return <LoadingState message="Querying flight anomaly telemetry logs..." />;
-  if (error) return <ErrorState message={error} onRetry={fetchAlerts} />;
+  if (error) return <ErrorState message={error} onRetry={() => fetchAlerts(selectedMission)} />;
 
   return (
     <div className="space-y-6">
@@ -89,7 +108,7 @@ export default function MissionControlAlertsPage() {
           )}
 
           <button
-            onClick={fetchAlerts}
+            onClick={() => fetchAlerts(selectedMission)}
             className="flex items-center gap-2 px-3 py-1.5 rounded-lg border border-purple-500/20 bg-purple-500/10 text-xs font-medium text-purple-300 hover:bg-purple-500/20 transition-all"
           >
             <RefreshCw className="w-3.5 h-3.5" />
@@ -102,7 +121,7 @@ export default function MissionControlAlertsPage() {
         <EmptyState title="Flight Systems Nominal" message="No operational alerts active for this mission." />
       ) : (
         <div className="space-y-3">
-          {alerts.map((a: any) => {
+          {alerts.map((a) => {
             const isCritical = a.severity === "Critical";
             return (
               <div

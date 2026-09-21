@@ -4,10 +4,21 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { getAllMedicalAlerts } from "../../../lib/api";
 import { LoadingState, ErrorState, EmptyState } from "../../../components/shared/LoadingState";
-import { Bell, AlertTriangle, CheckCircle2, ShieldAlert, Clock, RefreshCw, Eye } from "lucide-react";
+import { AlertTriangle, CheckCircle2, RefreshCw, Eye } from "lucide-react";
+
+interface MedicalAlert {
+  _id?: string;
+  id?: string;
+  astronautId: string;
+  type: string;
+  message: string;
+  severity: string;
+  resolved?: boolean;
+  createdAt?: string;
+}
 
 export default function MedicalAlertsPage() {
-  const [alerts, setAlerts] = useState<any[]>([]);
+  const [alerts, setAlerts] = useState<MedicalAlert[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [filter, setFilter] = useState("all");
@@ -18,19 +29,19 @@ export default function MedicalAlertsPage() {
     try {
       const res = await getAllMedicalAlerts();
       if (res.success && res.data) {
-        setAlerts(res.data || []);
+        setAlerts((res.data || []) as MedicalAlert[]);
       } else {
         setError(res.message || "Failed to load clinical alerts.");
       }
-    } catch (err: any) {
-      setError(err.message || "An unexpected error occurred.");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "An unexpected error occurred.");
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
-    fetchAlerts();
+    void Promise.resolve().then(() => fetchAlerts());
   }, []);
 
   if (loading) return <LoadingState message="Connecting to crew alert dispatch stream..." />;
@@ -110,7 +121,6 @@ export default function MedicalAlertsPage() {
         <div className="space-y-3">
           {filtered.map((alert) => {
             const isCritical = alert.severity === "Critical";
-            const isWarning = alert.severity === "Warning";
             const dateStr = alert.createdAt ? new Date(alert.createdAt).toLocaleString() : "Just now";
 
             return (

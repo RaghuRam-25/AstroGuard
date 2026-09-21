@@ -1,6 +1,7 @@
 import { Request, Response, NextFunction } from "express";
 import bcrypt from "bcryptjs";
 import { User, IUser } from "../models/User.js";
+import { Astronaut } from "../models/Astronaut.js";
 import {
   generateAccessToken,
   generateRefreshToken,
@@ -40,6 +41,7 @@ export class AuthController {
         email,
         username,
         password,
+        role = "astronaut",
         astronautId,
         phone,
         dateOfBirth,
@@ -63,14 +65,19 @@ export class AuthController {
       const salt = await bcrypt.genSalt(12);
       const passwordHash = await bcrypt.hash(password, salt);
 
-      // Create new user (role locked to 'astronaut' for security)
+      const finalAstronautId =
+        role === "astronaut"
+          ? astronautId || `AST-${Math.floor(100 + Math.random() * 900)}`
+          : astronautId || undefined;
+
+      // Create new user with selected role
       const user = await User.create({
         name,
         email: email.toLowerCase(),
         username: username.toLowerCase(),
         passwordHash,
-        role: "astronaut",
-        astronautId: astronautId || undefined,
+        role,
+        astronautId: finalAstronautId,
         phone,
         dateOfBirth: new Date(dateOfBirth),
         country,
@@ -78,6 +85,22 @@ export class AuthController {
         profileImage: profileImage || undefined,
         isActive: true,
       });
+
+      if (role === "astronaut" && finalAstronautId) {
+        await Astronaut.findOneAndUpdate(
+          { astronautId: finalAstronautId },
+          {
+            astronautId: finalAstronautId,
+            name,
+            role: "Astronaut",
+            mission: "Ares Mission 01",
+            missionDay: 142,
+            missionPhase: "Surface Operations",
+            status: "Active",
+          },
+          { upsert: true, new: true }
+        );
+      }
 
       // Generate Tokens & Cookies
       const accessToken = generateAccessToken(user);

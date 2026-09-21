@@ -5,6 +5,13 @@ import Link from "next/link";
 import { useAuth, UserRole } from "../../context/AuthContext";
 import { ShieldAlert, ArrowLeft } from "lucide-react";
 
+const ROLE_REDIRECTS: Record<string, string> = {
+  astronaut: "/astronaut/health",
+  medical_officer: "/medical/dashboard",
+  mission_control: "/mission-control/dashboard",
+  admin: "/admin/dashboard",
+};
+
 interface RoleGuardProps {
   allowedRoles: UserRole[];
   children: React.ReactNode;
@@ -14,6 +21,8 @@ export default function RoleGuard({ allowedRoles, children }: RoleGuardProps) {
   const { user } = useAuth();
 
   if (!user || !allowedRoles.includes(user.role)) {
+    const dashboardHref = user ? (ROLE_REDIRECTS[user.role] || "/login") : "/login";
+
     return (
       <div className="p-4 sm:p-8 max-w-2xl mx-auto my-12">
         <div className="rounded-3xl border border-red-500/30 bg-red-950/20 p-8 text-center space-y-5 backdrop-blur-md shadow-2xl">
@@ -37,7 +46,7 @@ export default function RoleGuard({ allowedRoles, children }: RoleGuardProps) {
 
           <div className="pt-2">
             <Link
-              href="/dashboard"
+              href={dashboardHref}
               className="inline-flex items-center gap-2 rounded-xl bg-blue-600 px-5 py-2.5 text-xs font-semibold text-white shadow-lg shadow-blue-600/30 hover:bg-blue-500 transition"
             >
               <ArrowLeft className="w-4 h-4" />

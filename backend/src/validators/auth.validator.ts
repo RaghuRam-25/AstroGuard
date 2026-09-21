@@ -33,6 +33,7 @@ export const registerSchema = z.object({
       }, "Date of birth must be a valid past date"),
     country: z.string().min(2, "Country is required").max(80).trim(),
     gender: z.enum(["female", "male", "non_binary", "prefer_not_to_say"]).optional(),
+    role: z.enum(["astronaut", "medical_officer", "mission_control", "admin"]).default("astronaut").optional(),
     astronautId: z.string().trim().max(40).optional(),
     profileImage: z.string().trim().max(1_500_000, "Profile image is too large").optional(),
     agreeToTerms: z.literal(true, {

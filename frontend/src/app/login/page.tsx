@@ -10,7 +10,7 @@ import { LoadingState } from "../../components/shared/LoadingState";
 import { Shield } from "lucide-react";
 
 const ROLE_REDIRECTS: Record<string, string> = {
-  astronaut: "/astronaut/dashboard",
+  astronaut: "/astronaut/health",
   medical_officer: "/medical/dashboard",
   mission_control: "/mission-control/dashboard",
   admin: "/admin/dashboard",

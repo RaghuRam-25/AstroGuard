@@ -1,0 +1,44 @@
+﻿
+> frontend@0.1.0 build
+> next build
+
+Γû▓ Next.js 16.3.5 (Turbopack)
+- Environments: .env.local
+Γ£ô Running next.config.ts took 92ms
+
+node.exe : ΓÜá The "middleware" file convention is deprecated. Please use "proxy" instead.
+At line:1 char:1
++ & "C:\Program Files\nodejs/node.exe" "C:\Program Files\nodejs/node_mo ...
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (ΓÜá The "middle...proxy" instead.:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+
+  To migrate automatically, run:
+  npx @next/codemod@canary middleware-to-proxy .
+
+  Learn more: https://nextjs.org/docs/messages/middleware-to-proxy
+  Creating an optimized production build ...
+/*! ≡ƒî╝ daisyUI 5.7.42 */
+Γ£ô Compiled successfully in 35.6s
+  Running TypeScript ...
+src/app/admin/astronauts/page.tsx(31,32): error TS2339: Property 'astronauts' does not exist on type '{}'.
+src/app/admin/audit-logs/page.tsx(30,26): error TS2339: Property 'logs' does not exist on type '{}'.
+src/app/admin/dashboard/page.tsx(53,36): error TS2339: Property 'logs' does not exist on type '{}'.
+src/app/admin/missions/page.tsx(37,30): error TS2339: Property 'missions' does not exist on type '{}'.
+src/app/admin/users/page.tsx(49,27): error TS2339: Property 'users' does not exist on type '{}'.
+src/app/medical/astronauts/[id]/health/page.tsx(36,29): error TS2339: Property 'records' does not exist on type '{}'.
+src/app/medical/astronauts/page.tsx(38,26): error TS2339: Property 'crew' does not exist on type '{}'.
+src/app/medical/dashboard/page.tsx(67,30): error TS2339: Property 'crew' does not exist on type '{}'.
+src/app/mission-control/alerts/page.tsx(38,33): error TS2339: Property 'missions' does not exist on type '{}'.
+src/app/mission-control/alerts/page.tsx(45,31): error TS2339: Property 'alerts' does not exist on type '{}'.
+src/app/mission-control/alerts/page.tsx(65,29): error TS2339: Property 'alerts' does not exist on type '{}'.
+src/app/mission-control/analytics/page.tsx(33,33): error TS2339: Property 'missions' does not exist on type '{}'.
+src/app/mission-control/dashboard/page.tsx(62,31): error TS2339: Property 'missions' does not exist on type '{}'.
+src/app/mission-control/missions/[id]/page.tsx(63,30): error TS2339: Property 'crew' does not exist on type '{}'.
+src/app/mission-control/missions/[id]/page.tsx(64,37): error TS2339: Property 'mission' does not exist on type '{}'.
+src/app/mission-control/missions/[id]/page.tsx(67,34): error TS2339: Property 'alerts' does not exist on type '{}'.
+src/app/mission-control/missions/page.tsx(29,30): error TS2339: Property 'missions' does not exist on type '{}'.
+src/components/health/HealthMetricCard.tsx(57,62): error TS2339: Property 'heartRate' does not exist on type '{ readonly heart: "#FB7185"; readonly droplet: "#38BDF8"; readonly moon: "#A78BFA"; readonly activity: "#22D3EE"; }'.
+Failed to type check.
+

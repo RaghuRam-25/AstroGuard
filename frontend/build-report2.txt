@@ -1,0 +1,78 @@
+﻿
+> frontend@0.1.0 build
+> next build
+
+Γû▓ Next.js 16.3.5 (Turbopack)
+- Environments: .env.local
+Γ£ô Running next.config.ts took 90ms
+
+node.exe : ΓÜá The "middleware" file convention is deprecated. Please use "proxy" instead.
+At line:1 char:1
++ & "C:\Program Files\nodejs/node.exe" "C:\Program Files\nodejs/node_mo ...
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (ΓÜá The "middle...proxy" instead.:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+
+  To migrate automatically, run:
+  npx @next/codemod@canary middleware-to-proxy .
+
+  Learn more: https://nextjs.org/docs/messages/middleware-to-proxy
+  Creating an optimized production build ...
+/*! ≡ƒî╝ daisyUI 5.7.42 */
+Γ£ô Compiled successfully in 5.9s
+  Running TypeScript ...
+  Finished TypeScript in 5.1s ...
+  Collecting page data using 11 workers ...
+  Generating static pages using 11 workers (0/34) ...
+  Generating static pages using 11 workers (8/34) 
+  Generating static pages using 11 workers (16/34) 
+  Generating static pages using 11 workers (25/34) 
+Γ£ô Generating static pages using 11 workers (34/34) in 1317ms
+  Finalizing page optimization ...
+
+Route (app)
+Γöî Γùï /
+Γö£ Γùï /_not-found
+Γö£ Γùï /about
+Γö£ Γùï /admin
+Γö£ Γùï /admin/astronauts
+Γö£ Γùï /admin/audit-logs
+Γö£ Γùï /admin/dashboard
+Γö£ Γùï /admin/missions
+Γö£ Γùï /admin/settings
+Γö£ Γùï /admin/users
+Γö£ Γùï /ai-analysis
+Γö£ Γùï /alerts
+Γö£ Γùï /astronaut/ai-analysis
+Γö£ Γùï /astronaut/alerts
+Γö£ Γùï /astronaut/dashboard
+Γö£ Γùï /astronaut/data-input
+Γö£ Γùï /astronaut/health
+Γö£ Γùï /astronaut/profile
+Γö£ Γùï /dashboard
+Γö£ Γùï /data-input
+Γö£ Γùï /health
+Γö£ Γùï /input
+Γö£ Γùï /login
+Γö£ Γùï /medical/alerts
+Γö£ Γùï /medical/astronauts
+Γö£ ╞Æ /medical/astronauts/[id]
+Γö£ ╞Æ /medical/astronauts/[id]/alerts
+Γö£ ╞Æ /medical/astronauts/[id]/analysis
+Γö£ ╞Æ /medical/astronauts/[id]/health
+Γö£ Γùï /medical/dashboard
+Γö£ Γùï /mission-control/alerts
+Γö£ Γùï /mission-control/analytics
+Γö£ Γùï /mission-control/dashboard
+Γö£ Γùï /mission-control/missions
+Γö£ ╞Æ /mission-control/missions/[id]
+Γö£ Γùï /register
+Γöö Γùï /unauthorized
+
+
+╞Æ Proxy (Middleware)
+
+Γùï  (Static)   prerendered as static content
+╞Æ  (Dynamic)  server-rendered on demand
+

@@ -1,6 +1,7 @@
 "use client";
 
 import React, { createContext, useContext, useState, useEffect, useCallback } from "react";
+import { useRouter } from "next/navigation";
 import { apiRequest } from "../lib/api";
 
 export type UserRole = "astronaut" | "medical_officer" | "mission_control" | "admin";
@@ -42,6 +43,7 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
+  const router = useRouter();
   const [user, setUser] = useState<AuthUser | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -73,7 +75,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   useEffect(() => {
-    refreshUser();
+    void Promise.resolve().then(() => refreshUser());
   }, [refreshUser]);
 
   const login = async (loginId: string, password: string): Promise<LoginResult> => {
@@ -92,8 +94,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setError(msg);
         return { success: false, message: msg };
       }
-    } catch (err: any) {
-      const msg = err.message || "Network error. Failed to login.";
+    } catch (err: unknown) {
+      const msg = err instanceof Error && err.message ? err.message : "Network error. Failed to login.";
       setError(msg);
       return { success: false, message: msg };
     }
@@ -106,9 +108,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       console.error("Logout error:", err);
     } finally {
       setUser(null);
-      if (typeof window !== "undefined") {
-        window.location.href = "/login";
-      }
+      router.replace("/login");
     }
   };
 

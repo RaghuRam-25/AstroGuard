@@ -3,10 +3,21 @@
 import { useEffect, useState } from "react";
 import { apiRequest } from "../../../lib/api";
 import { LoadingState, ErrorState, EmptyState } from "../../../components/shared/LoadingState";
-import { Users, Search, Rocket, Activity, Heart, RefreshCw } from "lucide-react";
+import { Search, RefreshCw } from "lucide-react";
+
+interface Astronaut {
+  _id?: string;
+  astronautId: string;
+  name: string;
+  role?: string;
+  status?: string;
+  mission?: string;
+  missionDay?: number;
+  missionPhase?: string;
+}
 
 export default function AdminAstronautsPage() {
-  const [astronauts, setAstronauts] = useState<any[]>([]);
+  const [astronauts, setAstronauts] = useState<Astronaut[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState("");
@@ -17,19 +28,20 @@ export default function AdminAstronautsPage() {
     try {
       const res = await apiRequest("/api/astronauts");
       if (res.success && res.data) {
-        setAstronauts(res.data.astronauts || res.data || []);
+        const data = res.data as { astronauts?: Astronaut[] } | Astronaut[];
+        setAstronauts(Array.isArray(data) ? data : data.astronauts || []);
       } else {
         setError(res.message || "Failed to load astronauts.");
       }
-    } catch (err: any) {
-      setError(err.message || "An unexpected error occurred.");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "An unexpected error occurred.");
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
-    fetchAstronauts();
+    void Promise.resolve().then(() => fetchAstronauts());
   }, []);
 
   if (loading) return <LoadingState message="Loading astronaut personnel master list..." />;

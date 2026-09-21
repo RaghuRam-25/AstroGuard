@@ -1,21 +1,40 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { getAstronautAnalysis } from "../../../../../lib/api";
-import { LoadingState, ErrorState, EmptyState } from "../../../../../components/shared/LoadingState";
-import { ArrowLeft, Sparkles, Brain, ShieldAlert, CheckCircle2, RefreshCw } from "lucide-react";
+import { LoadingState, ErrorState } from "../../../../../components/shared/LoadingState";
+import { ArrowLeft, Sparkles, RefreshCw } from "lucide-react";
+
+interface AnalysisContributor {
+  signal: string;
+  impact: string;
+  change: string;
+}
+
+interface AnalysisData {
+  latest?: {
+    anomalyScore?: number;
+    riskLevel?: string;
+    explanation?: {
+      headline?: string;
+      summary?: string;
+      changePointDetails?: string;
+    };
+    contributors?: AnalysisContributor[];
+  };
+}
 
 export default function MedicalAstronautAnalysisPage() {
   const params = useParams();
   const astronautId = params?.id as string;
 
-  const [analysisData, setAnalysisData] = useState<any>(null);
+  const [analysisData, setAnalysisData] = useState<AnalysisData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const fetchAnalysis = async () => {
+  const fetchAnalysis = useCallback(async () => {
     if (!astronautId) return;
     setLoading(true);
     setError(null);
@@ -26,21 +45,21 @@ export default function MedicalAstronautAnalysisPage() {
       } else {
         setError(res.message || "Failed to load AI clinical analysis.");
       }
-    } catch (err: any) {
-      setError(err.message || "An unexpected error occurred.");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "An unexpected error occurred.");
     } finally {
       setLoading(false);
     }
-  };
+  }, [astronautId]);
 
   useEffect(() => {
-    fetchAnalysis();
-  }, [astronautId]);
+    void Promise.resolve().then(() => fetchAnalysis());
+  }, [astronautId, fetchAnalysis]);
 
   if (loading) return <LoadingState message={`Computing anomaly evaluation for ${astronautId}...`} />;
   if (error) return <ErrorState message={error} onRetry={fetchAnalysis} />;
 
-  const { latest, history } = analysisData || {};
+  const { latest } = analysisData || ({} as AnalysisData);
   const score = latest?.anomalyScore ?? 0.08;
   const scorePct = Math.round(score * 100);
   const risk = latest?.riskLevel ?? "Low";
@@ -121,7 +140,7 @@ export default function MedicalAstronautAnalysisPage() {
         <div className="p-6 rounded-2xl border border-white/5 bg-[#051c14] space-y-4">
           <h3 className="text-sm font-semibold text-white uppercase tracking-wider">Biometric Signal Drivers</h3>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-            {latest.contributors.map((c: any, i: number) => (
+            {latest.contributors.map((c, i) => (
               <div key={i} className="p-4 rounded-xl border border-white/5 bg-black/20 space-y-1.5">
                 <div className="flex items-center justify-between text-xs">
                   <span className="font-semibold text-white">{c.signal}</span>

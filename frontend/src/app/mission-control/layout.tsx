@@ -5,13 +5,13 @@ import Image from "next/image";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
 import { useAuth } from "../../context/AuthContext";
+import ProtectedRoute from "../../components/auth/ProtectedRoute";
+import RoleGuard from "../../components/auth/RoleGuard";
 import {
   LayoutDashboard,
   Rocket,
-  Users,
   BarChart3,
   Bell,
-  CalendarDays,
   LogOut,
   Menu,
   X,
@@ -31,6 +31,8 @@ export default function MissionControlLayout({ children }: { children: React.Rea
   const [mobileOpen, setMobileOpen] = useState(false);
 
   return (
+    <ProtectedRoute>
+      <RoleGuard allowedRoles={["mission_control"]}>
     <div className="flex min-h-screen bg-[#07020f] text-white">
       {/* Desktop Sidebar — purple/violet accent (operational) */}
       <aside className="hidden lg:flex w-64 flex-col justify-between border-r border-purple-500/10 bg-[#0f0520]/95 p-5 shrink-0 fixed top-0 bottom-0 left-0 z-40 backdrop-blur-md">
@@ -152,5 +154,7 @@ export default function MissionControlLayout({ children }: { children: React.Rea
         <main className="flex-1 p-4 sm:p-6 lg:p-8">{children}</main>
       </div>
     </div>
+      </RoleGuard>
+    </ProtectedRoute>
   );
 }

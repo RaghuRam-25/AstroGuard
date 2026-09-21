@@ -4,10 +4,19 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { getAssignedMissions } from "../../../lib/api";
 import { LoadingState, ErrorState, EmptyState } from "../../../components/shared/LoadingState";
-import { Rocket, Calendar, Users, ChevronRight, RefreshCw, Radio } from "lucide-react";
+import { Rocket, ChevronRight, RefreshCw } from "lucide-react";
+
+interface Mission {
+  _id?: string;
+  missionId?: string;
+  name: string;
+  status?: string;
+  missionDay?: number;
+  astronautIds?: string[];
+}
 
 export default function MissionControlMissionsPage() {
-  const [missions, setMissions] = useState<any[]>([]);
+  const [missions, setMissions] = useState<Mission[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -17,19 +26,19 @@ export default function MissionControlMissionsPage() {
     try {
       const res = await getAssignedMissions();
       if (res.success && res.data) {
-        setMissions(res.data.missions || []);
+        setMissions((res.data as { missions?: Mission[] }).missions || []);
       } else {
         setError(res.message || "Failed to load missions.");
       }
-    } catch (err: any) {
-      setError(err.message || "An unexpected error occurred.");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "An unexpected error occurred.");
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
-    fetchMissions();
+    void Promise.resolve().then(() => fetchMissions());
   }, []);
 
   if (loading) return <LoadingState message="Accessing active spaceflight registry..." />;

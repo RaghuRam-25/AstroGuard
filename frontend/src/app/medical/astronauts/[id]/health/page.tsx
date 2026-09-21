@@ -1,41 +1,52 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { getAstronautHealth } from "../../../../../lib/api";
 import { LoadingState, ErrorState, EmptyState } from "../../../../../components/shared/LoadingState";
-import { ArrowLeft, RefreshCw, Activity, Calendar } from "lucide-react";
+import { ArrowLeft, RefreshCw } from "lucide-react";
+
+interface HealthRecord {
+  _id?: string;
+  createdAt?: string;
+  timestamp?: string;
+  heartRate: number;
+  spo2: number;
+  sleep: number;
+  activity: number;
+  source?: string;
+}
 
 export default function MedicalAstronautHealthPage() {
   const params = useParams();
   const astronautId = params?.id as string;
 
-  const [records, setRecords] = useState<any[]>([]);
+  const [records, setRecords] = useState<HealthRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const fetchRecords = async () => {
+  const fetchRecords = useCallback(async () => {
     if (!astronautId) return;
     setLoading(true);
     setError(null);
     try {
       const res = await getAstronautHealth(astronautId, { limit: 50 });
       if (res.success && res.data) {
-        setRecords(res.data.records || []);
+        setRecords((res.data as { records?: HealthRecord[] }).records || []);
       } else {
         setError(res.message || "Failed to load telemetry history.");
       }
-    } catch (err: any) {
-      setError(err.message || "An unexpected error occurred.");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "An unexpected error occurred.");
     } finally {
       setLoading(false);
     }
-  };
+  }, [astronautId]);
 
   useEffect(() => {
-    fetchRecords();
-  }, [astronautId]);
+    void Promise.resolve().then(() => fetchRecords());
+  }, [astronautId, fetchRecords]);
 
   if (loading) return <LoadingState message={`Fetching telemetry logs for ${astronautId}...`} />;
   if (error) return <ErrorState message={error} onRetry={fetchRecords} />;
@@ -89,10 +100,12 @@ export default function MedicalAstronautHealthPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-white/5 text-slate-300 font-mono">
-                {records.map((log: any, idx: number) => (
+                {records.map((log, idx) => {
+                  const ts = log.createdAt || log.timestamp;
+                  return (
                   <tr key={log._id || idx} className="hover:bg-white/[0.02] transition-colors">
                     <td className="px-4 py-3 text-slate-400">
-                      {log.createdAt || log.timestamp ? new Date(log.createdAt || log.timestamp).toLocaleString() : "Live"}
+                      {ts ? new Date(ts).toLocaleString() : "Live"}
                     </td>
                     <td className="px-4 py-3">
                       <span className={log.heartRate > 100 || log.heartRate < 55 ? "text-red-400 font-bold" : "text-white"}>
@@ -108,7 +121,8 @@ export default function MedicalAstronautHealthPage() {
                     <td className="px-4 py-3 text-white">{log.activity}%</td>
                     <td className="px-4 py-3 text-slate-400 font-sans">{log.source || "Suit Sensor"}</td>
                   </tr>
-                ))}
+                  );
+                })}
               </tbody>
             </table>
           </div>

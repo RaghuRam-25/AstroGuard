@@ -2,10 +2,10 @@
 
 import Link from "next/link";
 import { useAuth } from "../../context/AuthContext";
-import { ShieldAlert, ArrowLeft, Home, LogOut } from "lucide-react";
+import { ShieldAlert, Home, LogOut } from "lucide-react";
 
 const ROLE_DASHBOARDS: Record<string, string> = {
-  astronaut: "/astronaut/dashboard",
+  astronaut: "/astronaut/health",
   medical_officer: "/medical/dashboard",
   mission_control: "/mission-control/dashboard",
   admin: "/admin/dashboard",

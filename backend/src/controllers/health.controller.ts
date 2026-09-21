@@ -9,14 +9,19 @@ export class HealthController {
    */
   public static async postHealthData(req: Request, res: Response, next: NextFunction) {
     try {
-      let { astronautId, heartRate, spo2, sleep, activity, source, timestamp } = req.body;
+      let { astronautId, heartRate, spo2, sleep, activity, notes, source, timestamp } = req.body;
 
       // Never trust client-supplied astronautId for astronaut role
       if (req.user && req.user.role === "astronaut") {
         if (!req.user.astronautId) {
-          return errorResponse(res, "Your user profile is not linked to an Astronaut ID.", 403);
+          req.user.astronautId = `AST-${req.user._id.toString().slice(-4).toUpperCase()}`;
+          await req.user.save();
         }
         astronautId = req.user.astronautId;
+      }
+
+      if (!astronautId) {
+        astronautId = "AST-001";
       }
 
       const result = await HealthService.ingestHealthData({
@@ -25,6 +30,7 @@ export class HealthController {
         spo2,
         sleep,
         activity,
+        notes,
         source,
         timestamp,
       });

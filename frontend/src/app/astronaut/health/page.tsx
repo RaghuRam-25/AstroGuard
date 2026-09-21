@@ -1,191 +1,96 @@
-"use client";
+import HealthMetricCard from "@/components/health/HealthMetricCard";
+import AnomalyScore from "@/components/health/AnomalyScore";
+import HealthTrendChart from "@/components/health/HealthTrendChart";
+import OverallHealthStatus from "@/components/health/OverallHealthStatus";
+import RecentAlerts from "@/components/health/RecentAlerts";
+import HealthMetricsBreakdown from "@/components/health/HealthMetricsBreakdown";
+import AnomalyAnalysis from "@/components/health/AnomalyAnalysis";
+import AIHealthInsight from "@/components/health/AIHealthInsight";
+import MissionInformation from "@/components/health/MissionInformation";
+import { healthMetrics } from "@/data/mockData";
 
-import { useEffect, useState } from "react";
-import { useAuth } from "../../../context/AuthContext";
-import { getMyHealth, getMyLatestHealth } from "../../../lib/api";
-import { LoadingState, ErrorState, EmptyState } from "../../../components/shared/LoadingState";
-import { Heart, Droplet, Moon, Activity, Calendar, Clock, ArrowUpRight, ArrowDownRight, RefreshCw } from "lucide-react";
+export const metadata = {
+  title: "My Health - AstroGuard",
+};
 
 export default function AstronautHealthPage() {
-  const { user } = useAuth();
-  const [healthLogs, setHealthLogs] = useState<any[]>([]);
-  const [latestVitals, setLatestVitals] = useState<any>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
-  const astronautId = user?.astronautId || "AST-001";
-
-  const fetchHealthData = async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const [historyRes, latestRes] = await Promise.all([
-        getMyHealth(astronautId, { limit: 30 }),
-        getMyLatestHealth(astronautId),
-      ]);
-
-      if (historyRes.success && historyRes.data) {
-        setHealthLogs(historyRes.data.healthData || historyRes.data || []);
-      }
-      if (latestRes.success && latestRes.data) {
-        setLatestVitals(latestRes.data);
-      }
-    } catch (err: any) {
-      setError(err.message || "Failed to load telemetry data.");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    fetchHealthData();
-  }, [astronautId]);
-
-  if (loading) return <LoadingState message="Connecting to biometric telemetry stream..." />;
-  if (error) return <ErrorState message={error} onRetry={fetchHealthData} />;
-
-  const hr = latestVitals?.heartRate ?? 74;
-  const spo2 = latestVitals?.spo2 ?? 98;
-  const sleep = latestVitals?.sleep ?? 7.2;
-  const act = latestVitals?.activity ?? 75;
-
   return (
-    <div className="space-y-6">
-      {/* Page Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-blue-500/10 pb-5">
-        <div>
-          <span className="text-xs uppercase tracking-widest font-semibold text-blue-400">
-            Personal Telemetry Stream
-          </span>
-          <h1 className="text-2xl font-bold tracking-tight text-white mt-1">Biometric Telemetry History</h1>
-          <p className="text-sm text-slate-400">
-            Real-time sensory tracking and recorded telemetry for astronaut{" "}
-            <span className="font-mono text-blue-400">{astronautId}</span>.
-          </p>
-        </div>
-        <button
-          onClick={fetchHealthData}
-          className="self-start sm:self-auto flex items-center gap-2 px-3 py-1.5 rounded-lg border border-blue-500/20 bg-blue-500/10 text-xs font-medium text-blue-300 hover:bg-blue-500/20 transition-all"
-        >
-          <RefreshCw className="w-3.5 h-3.5" />
-          Refresh Stream
-        </button>
+    <div className="animate-fade-in space-y-5 lg:space-y-6">
+      <SpaceBackdrop />
+
+      {/* Metric cards */}
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        {healthMetrics.map((metric) => (
+          <HealthMetricCard key={metric.id} metric={metric} />
+        ))}
       </div>
 
-      {/* Real-time Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="p-4 rounded-xl border border-red-500/20 bg-[#071322] space-y-3">
-          <div className="flex items-center justify-between">
-            <span className="text-xs text-slate-400">Heart Rate</span>
-            <div className="p-1.5 rounded-lg bg-red-500/10 text-red-400">
-              <Heart className="w-4 h-4" />
-            </div>
-          </div>
-          <div className="flex items-baseline gap-2">
-            <span className="text-2xl font-bold text-white">{hr}</span>
-            <span className="text-xs text-slate-400">BPM</span>
-          </div>
-          <div className="text-[11px] text-slate-400">Target Range: 60 - 100 BPM</div>
+      {/* Anomaly score + Health trends */}
+      <div className="grid grid-cols-1 gap-5 lg:grid-cols-12">
+        <div className="lg:col-span-4">
+          <AnomalyScore />
         </div>
-
-        <div className="p-4 rounded-xl border border-cyan-500/20 bg-[#071322] space-y-3">
-          <div className="flex items-center justify-between">
-            <span className="text-xs text-slate-400">Blood Oxygen (SpO₂)</span>
-            <div className="p-1.5 rounded-lg bg-cyan-500/10 text-cyan-400">
-              <Droplet className="w-4 h-4" />
-            </div>
-          </div>
-          <div className="flex items-baseline gap-2">
-            <span className="text-2xl font-bold text-white">{spo2}%</span>
-            <span className="text-xs text-slate-400">Sat</span>
-          </div>
-          <div className="text-[11px] text-slate-400">Target: &gt; 95%</div>
-        </div>
-
-        <div className="p-4 rounded-xl border border-indigo-500/20 bg-[#071322] space-y-3">
-          <div className="flex items-center justify-between">
-            <span className="text-xs text-slate-400">Sleep Duration</span>
-            <div className="p-1.5 rounded-lg bg-indigo-500/10 text-indigo-400">
-              <Moon className="w-4 h-4" />
-            </div>
-          </div>
-          <div className="flex items-baseline gap-2">
-            <span className="text-2xl font-bold text-white">{sleep}</span>
-            <span className="text-xs text-slate-400">Hours</span>
-          </div>
-          <div className="text-[11px] text-slate-400">Rest Requirement: 7.0 - 8.5 hrs</div>
-        </div>
-
-        <div className="p-4 rounded-xl border border-emerald-500/20 bg-[#071322] space-y-3">
-          <div className="flex items-center justify-between">
-            <span className="text-xs text-slate-400">Activity Level</span>
-            <div className="p-1.5 rounded-lg bg-emerald-500/10 text-emerald-400">
-              <Activity className="w-4 h-4" />
-            </div>
-          </div>
-          <div className="flex items-baseline gap-2">
-            <span className="text-2xl font-bold text-white">{act}%</span>
-            <span className="text-xs text-slate-400">Index</span>
-          </div>
-          <div className="text-[11px] text-slate-400">EVA & Exercise Protocol</div>
+        <div className="lg:col-span-8">
+          <HealthTrendChart />
         </div>
       </div>
 
-      {/* Telemetry Log Table */}
-      <div className="rounded-xl border border-white/5 bg-[#071322] overflow-hidden">
-        <div className="px-5 py-4 border-b border-white/5 flex items-center justify-between">
-          <div>
-            <h2 className="text-base font-semibold text-white">Recorded Telemetry Logs</h2>
-            <p className="text-xs text-slate-400 mt-0.5">Sequential records transmitted from onboard telemetry pack</p>
-          </div>
-          <span className="text-xs font-mono text-slate-400">{healthLogs.length} Records</span>
+      {/* Overall status + Recent alerts */}
+      <div className="grid grid-cols-1 gap-5 lg:grid-cols-12">
+        <div className="lg:col-span-4">
+          <OverallHealthStatus />
         </div>
-
-        {healthLogs.length === 0 ? (
-          <EmptyState
-            title="No Telemetry Records"
-            message="No historical health logs have been registered for this astronaut."
-          />
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs">
-              <thead className="bg-white/[0.02] text-slate-400 border-b border-white/5 uppercase tracking-wider font-semibold">
-                <tr>
-                  <th className="px-4 py-3">Timestamp</th>
-                  <th className="px-4 py-3">Heart Rate</th>
-                  <th className="px-4 py-3">SpO₂</th>
-                  <th className="px-4 py-3">Sleep</th>
-                  <th className="px-4 py-3">Activity</th>
-                  <th className="px-4 py-3">Transmission Source</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-white/5 text-slate-300 font-mono">
-                {healthLogs.map((log: any, idx: number) => {
-                  const dateStr = log.createdAt ? new Date(log.createdAt).toLocaleString() : "Live Stream";
-                  return (
-                    <tr key={log._id || idx} className="hover:bg-white/[0.02] transition-colors">
-                      <td className="px-4 py-3 text-slate-400">{dateStr}</td>
-                      <td className="px-4 py-3">
-                        <span className={`font-semibold ${log.heartRate > 100 || log.heartRate < 55 ? "text-red-400" : "text-white"}`}>
-                          {log.heartRate} BPM
-                        </span>
-                      </td>
-                      <td className="px-4 py-3">
-                        <span className={`font-semibold ${log.spo2 < 95 ? "text-amber-400" : "text-cyan-300"}`}>
-                          {log.spo2}%
-                        </span>
-                      </td>
-                      <td className="px-4 py-3 text-white">{log.sleep} hrs</td>
-                      <td className="px-4 py-3 text-white">{log.activity}%</td>
-                      <td className="px-4 py-3 text-slate-400 font-sans">{log.source || "Suit Sensor v3.2"}</td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        )}
+        <div className="lg:col-span-8">
+          <RecentAlerts />
+        </div>
       </div>
+
+      {/* Breakdown + anomaly analysis */}
+      <div className="grid grid-cols-1 gap-5 lg:grid-cols-12">
+        <div className="lg:col-span-7">
+          <HealthMetricsBreakdown />
+        </div>
+        <div className="lg:col-span-5">
+          <AnomalyAnalysis />
+        </div>
+      </div>
+
+      {/* AI insight + mission info */}
+      <div className="grid grid-cols-1 gap-5 lg:grid-cols-12">
+        <div className="lg:col-span-8">
+          <AIHealthInsight />
+        </div>
+        <div className="lg:col-span-4">
+          <MissionInformation />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function SpaceBackdrop() {
+  return (
+    <div
+      aria-hidden="true"
+      className="pointer-events-none fixed inset-0 -z-10 overflow-hidden"
+    >
+      {/* Top-right atmospheric glow */}
+      <div className="absolute -right-40 -top-44 h-[36rem] w-[36rem] rounded-full bg-[radial-gradient(circle_at_center,rgba(56,189,248,0.09),transparent_65%)] blur-2xl" />
+
+      {/* Lower-left Earth visual */}
+      <div className="absolute -bottom-80 -left-44 h-[44rem] w-[56rem] rounded-full bg-[radial-gradient(circle_at_45%_15%,rgba(56,189,248,0.18),rgba(14,165,233,0.10)_40%,transparent_72%)] blur-md" />
+      <div className="absolute -bottom-44 -left-24 h-80 w-[48rem] rounded-[50%] border border-t-2 border-sky-400/10" />
+      <div className="absolute -bottom-32 -left-16 h-56 w-[44rem] rounded-[50%] border border-sky-400/[0.07]" />
+
+      {/* Tiny stars */}
+      <span className="absolute left-[16%] top-[20%] h-1 w-1 rounded-full bg-white/30" />
+      <span className="absolute left-[30%] top-[10%] h-0.5 w-0.5 rounded-full bg-white/40" />
+      <span className="absolute left-[24%] top-[64%] h-0.5 w-0.5 rounded-full bg-white/25" />
+      <span className="absolute left-[42%] top-[8%] h-1 w-1 rounded-full bg-cyan-300/30" />
+      <span className="absolute right-[18%] top-[18%] h-0.5 w-0.5 rounded-full bg-white/30" />
+      <span className="absolute right-[32%] top-[6%] h-1 w-1 rounded-full bg-white/25" />
+      <span className="absolute bottom-[30%] left-[52%] h-0.5 w-0.5 rounded-full bg-white/20" />
+      <span className="absolute bottom-[14%] left-[68%] h-1 w-1 rounded-full bg-cyan-300/25" />
     </div>
   );
 }

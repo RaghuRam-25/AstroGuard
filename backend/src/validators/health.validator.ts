@@ -2,7 +2,7 @@ import { z } from "zod";
 
 export const createHealthDataSchema = z.object({
   body: z.object({
-    astronautId: z.string().min(1, "Astronaut ID is required").trim(),
+    astronautId: z.string().trim().optional(),
     heartRate: z.coerce
       .number()
       .min(30, "Heart rate must be between 30 and 220 BPM")
@@ -19,6 +19,7 @@ export const createHealthDataSchema = z.object({
       .number()
       .min(0, "Activity level must be between 0% and 100%")
       .max(100, "Activity level must be between 0% and 100%"),
+    notes: z.string().trim().optional(),
     timestamp: z.coerce.date().optional(),
     source: z.enum(["manual", "sensor", "csv"]).default("manual").optional(),
   }),

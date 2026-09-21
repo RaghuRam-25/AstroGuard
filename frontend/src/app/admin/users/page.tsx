@@ -4,22 +4,26 @@ import { useEffect, useState } from "react";
 import { getAdminUsers, createAdminUser, updateUserStatus, updateUserRole } from "../../../lib/api";
 import { LoadingState, ErrorState, EmptyState } from "../../../components/shared/LoadingState";
 import {
-  Users,
   UserPlus,
-  Shield,
   Search,
-  CheckCircle2,
-  XCircle,
   RefreshCw,
   Plus,
   X,
-  Lock,
-  Mail,
-  User,
 } from "lucide-react";
 
+interface AdminUser {
+  id: string;
+  name: string;
+  email: string;
+  role: string;
+  isActive: boolean;
+  astronautId?: string;
+  assignedAstronautIds?: string[];
+  missionIds?: string[];
+}
+
 export default function AdminUsersPage() {
-  const [users, setUsers] = useState<any[]>([]);
+  const [users, setUsers] = useState<AdminUser[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState("");
@@ -42,22 +46,22 @@ export default function AdminUsersPage() {
     try {
       const res = await getAdminUsers();
       if (res.success && res.data) {
-        setUsers(res.data.users || []);
+        setUsers((res.data as { users?: AdminUser[] }).users || []);
       } else {
         setError(res.message || "Failed to load users.");
       }
-    } catch (err: any) {
-      setError(err.message || "An unexpected error occurred.");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "An unexpected error occurred.");
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
-    fetchUsers();
+    void Promise.resolve().then(() => fetchUsers());
   }, []);
 
-  const handleToggleStatus = async (user: any) => {
+  const handleToggleStatus = async (user: AdminUser) => {
     const nextStatus = !user.isActive;
     try {
       const res = await updateUserStatus(user.id, nextStatus);
@@ -71,7 +75,7 @@ export default function AdminUsersPage() {
     }
   };
 
-  const handleChangeRole = async (user: any, newRole: string) => {
+  const handleChangeRole = async (user: AdminUser, newRole: string) => {
     try {
       const res = await updateUserRole(user.id, newRole);
       if (res.success) {
@@ -103,8 +107,8 @@ export default function AdminUsersPage() {
       } else {
         setModalError(res.message || "Failed to create user.");
       }
-    } catch (err: any) {
-      setModalError(err.message || "Failed to create user.");
+    } catch (err) {
+      setModalError(err instanceof Error ? err.message : "Failed to create user.");
     } finally {
       setSubmitting(false);
     }
@@ -203,11 +207,6 @@ export default function AdminUsersPage() {
               </thead>
               <tbody className="divide-y divide-white/5 text-slate-300">
                 {filtered.map((u) => {
-                  const isAstronaut = u.role === "astronaut";
-                  const isMedical = u.role === "medical_officer";
-                  const isMission = u.role === "mission_control";
-                  const isAdmin = u.role === "admin";
-
                   return (
                     <tr key={u.id} className="hover:bg-white/[0.02] transition-colors">
                       <td className="px-5 py-4">
@@ -232,10 +231,10 @@ export default function AdminUsersPage() {
 
                       <td className="px-4 py-4 font-mono text-[11px] text-slate-400">
                         {u.astronautId && <span className="text-blue-400">{u.astronautId}</span>}
-                        {u.assignedAstronautIds?.length > 0 && (
+                        {u.assignedAstronautIds && u.assignedAstronautIds.length > 0 && (
                           <span className="text-emerald-400">{u.assignedAstronautIds.join(", ")}</span>
                         )}
-                        {u.missionIds?.length > 0 && (
+                        {u.missionIds && u.missionIds.length > 0 && (
                           <span className="text-purple-300">{u.missionIds.join(", ")}</span>
                         )}
                         {!u.astronautId && !u.assignedAstronautIds?.length && !u.missionIds?.length && "Global Access"}

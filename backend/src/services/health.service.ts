@@ -9,6 +9,7 @@ export interface IngestHealthInput {
   spo2: number;
   sleep: number;
   activity: number;
+  notes?: string;
   source?: "manual" | "sensor" | "csv";
   timestamp?: Date;
 }
@@ -44,6 +45,7 @@ export class HealthService {
       spo2: input.spo2,
       sleep: input.sleep,
       activity: input.activity,
+      notes: input.notes || "",
       source: input.source || "manual",
       timestamp: input.timestamp || new Date(),
     });

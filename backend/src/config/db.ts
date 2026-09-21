@@ -14,7 +14,7 @@ export const connectDB = async (): Promise<typeof mongoose> => {
     });
 
     console.log(`🌌 MongoDB Connected: ${conn.connection.host}/${conn.connection.name}`);
-    if (conn.connection.name !== "AstroGuard") {
+    if (conn.connection.name.toLowerCase() !== "astroguard") {
       throw new Error(
         `Connected database must be AstroGuard. Current database: ${conn.connection.name || "unknown"}`
       );

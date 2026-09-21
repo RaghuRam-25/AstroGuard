@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Settings, Shield, Cpu, Lock, CheckCircle2, Save } from "lucide-react";
+import { Shield, Cpu, CheckCircle2, Save } from "lucide-react";
 
 export default function AdminSettingsPage() {
   const [saved, setSaved] = useState(false);

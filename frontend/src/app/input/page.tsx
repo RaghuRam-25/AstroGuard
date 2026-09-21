@@ -7,6 +7,14 @@ import ProtectedRoute from "../../components/auth/ProtectedRoute";
 import { useAuth } from "../../context/AuthContext";
 import { apiRequest } from "../../lib/api";
 
+interface AnomalyAnalysisResult {
+  analysis: {
+    anomalyScore: number;
+    riskLevel: string;
+    confidence: number;
+  };
+}
+
 export default function DataInputPage() {
   const { user } = useAuth();
   const [activeTab, setActiveTab] = useState("Manual Input");
@@ -21,13 +29,17 @@ export default function DataInputPage() {
   });
 
   const [loading, setLoading] = useState(false);
-  const [resultData, setResultData] = useState<any>(null);
+  const [resultData, setResultData] = useState<AnomalyAnalysisResult | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   useEffect(() => {
     if (user && user.role === "astronaut" && user.astronautId) {
-      setSelectedAstronautId(user.astronautId);
-      setSelectedAstronaut(user.name);
+      const astronautId = user.astronautId;
+      const astronautName = user.name;
+      void Promise.resolve().then(() => {
+        setSelectedAstronautId(astronautId);
+        setSelectedAstronaut(astronautName);
+      });
     }
   }, [user]);
 
@@ -78,12 +90,14 @@ export default function DataInputPage() {
       });
 
       if (res.success && res.data) {
-        setResultData(res.data);
+        setResultData(res.data as AnomalyAnalysisResult);
       } else {
         setErrorMessage(res.message || "Failed to submit telemetry.");
       }
-    } catch (err: any) {
-      setErrorMessage(err.message || "Network error submitting health data.");
+    } catch (err) {
+      setErrorMessage(
+        err instanceof Error ? err.message : "Network error submitting health data."
+      );
     } finally {
       setLoading(false);
     }

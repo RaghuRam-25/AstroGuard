@@ -65,7 +65,7 @@ export default function AstronautDashboardPage() {
       }
 
       if (al?.success && al?.data) {
-        const rawAlerts = Array.isArray(al.data) ? al.data : Array.isArray(al.data?.alerts) ? al.data.alerts : [];
+        const rawAlerts = Array.isArray(al.data) ? al.data : Array.isArray((al.data as any)?.alerts) ? (al.data as any).alerts : [];
         setAlerts(rawAlerts.slice(0, 4));
       } else {
         setAlerts([]);

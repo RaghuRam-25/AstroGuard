@@ -6,6 +6,7 @@ export interface IHealthData extends Document {
   spo2: number;
   sleep: number;
   activity: number;
+  notes?: string;
   timestamp: Date;
   source: "manual" | "sensor" | "csv";
   createdAt: Date;
@@ -43,6 +44,11 @@ const HealthDataSchema: Schema = new Schema(
       required: [true, "Activity level is required"],
       min: [0, "Activity level cannot be negative"],
       max: [100, "Activity level cannot exceed 100%"],
+    },
+    notes: {
+      type: String,
+      trim: true,
+      default: "",
     },
     timestamp: {
       type: Date,

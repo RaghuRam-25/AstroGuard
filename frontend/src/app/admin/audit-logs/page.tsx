@@ -3,13 +3,23 @@
 import { useEffect, useState } from "react";
 import { getAuditLogs } from "../../../lib/api";
 import { LoadingState, ErrorState, EmptyState } from "../../../components/shared/LoadingState";
-import { ScrollText, Search, Shield, Clock, RefreshCw, Filter } from "lucide-react";
+import { RefreshCw } from "lucide-react";
+
+interface AuditLog {
+  _id?: string;
+  action: string;
+  userEmail?: string;
+  resource: string;
+  resourceId?: string;
+  ipAddress?: string;
+  createdAt?: string;
+}
 
 export default function AdminAuditLogsPage() {
-  const [logs, setLogs] = useState<any[]>([]);
+  const [logs, setLogs] = useState<AuditLog[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [actionFilter, setActionFilter] = useState("all");
+  const [actionFilter] = useState("all");
 
   const fetchLogs = async () => {
     setLoading(true);
@@ -17,19 +27,19 @@ export default function AdminAuditLogsPage() {
     try {
       const res = await getAuditLogs({ limit: 100 });
       if (res.success && res.data) {
-        setLogs(res.data.logs || []);
+        setLogs((res.data as { logs?: AuditLog[] }).logs || []);
       } else {
         setError(res.message || "Failed to load audit logs.");
       }
-    } catch (err: any) {
-      setError(err.message || "An unexpected error occurred.");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "An unexpected error occurred.");
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
-    fetchLogs();
+    void Promise.resolve().then(() => fetchLogs());
   }, []);
 
   if (loading) return <LoadingState message="Accessing cryptographically sealed audit trail..." />;
@@ -80,7 +90,7 @@ export default function AdminAuditLogsPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-white/5 text-slate-300 font-mono">
-                {filtered.map((log: any, idx: number) => {
+                {filtered.map((log, idx) => {
                   const dateStr = log.createdAt ? new Date(log.createdAt).toLocaleString() : "Just now";
                   return (
                     <tr key={log._id || idx} className="hover:bg-white/[0.02] transition-colors">

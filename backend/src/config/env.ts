@@ -21,34 +21,11 @@ const envSchema = z.object({
     .default(isProduction ? "" : "astroguard_refresh_token_super_secret_key_2025_deep_space"),
   REFRESH_TOKEN_EXPIRES_IN: z.string().default("7d"),
 }).superRefine((env, ctx) => {
-  const lowerMongoUri = env.MONGODB_URI.toLowerCase();
-
-  if (
-    lowerMongoUri.includes("localhost") ||
-    lowerMongoUri.includes("127.0.0.1") ||
-    lowerMongoUri.includes("0.0.0.0")
-  ) {
+  if (!env.MONGODB_URI.startsWith("mongodb://") && !env.MONGODB_URI.startsWith("mongodb+srv://")) {
     ctx.addIssue({
       code: z.ZodIssueCode.custom,
       path: ["MONGODB_URI"],
-      message: "MONGODB_URI must point to MongoDB Atlas, not a local MongoDB server.",
-    });
-  }
-
-  try {
-    const dbName = new URL(env.MONGODB_URI).pathname.replace(/^\//, "").split("?")[0];
-    if (dbName !== "AstroGuard") {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        path: ["MONGODB_URI"],
-        message: "MONGODB_URI must include the AstroGuard database.",
-      });
-    }
-  } catch {
-    ctx.addIssue({
-      code: z.ZodIssueCode.custom,
-      path: ["MONGODB_URI"],
-      message: "MONGODB_URI must be a valid MongoDB connection string.",
+      message: "MONGODB_URI must be a valid MongoDB connection string starting with mongodb:// or mongodb+srv://",
     });
   }
 

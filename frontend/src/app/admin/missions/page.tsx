@@ -1,12 +1,21 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { getAdminMissions, createAdminMission, assignAstronautToMission } from "../../../lib/api";
+import { getAdminMissions, createAdminMission } from "../../../lib/api";
 import { LoadingState, ErrorState, EmptyState } from "../../../components/shared/LoadingState";
-import { Rocket, Plus, X, Users, RefreshCw, CheckCircle2 } from "lucide-react";
+import { Rocket, Plus, X, RefreshCw } from "lucide-react";
+
+interface Mission {
+  _id?: string;
+  missionId: string;
+  name: string;
+  status?: string;
+  missionDay?: number;
+  astronautIds?: string[];
+}
 
 export default function AdminMissionsPage() {
-  const [missions, setMissions] = useState<any[]>([]);
+  const [missions, setMissions] = useState<Mission[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
@@ -25,19 +34,20 @@ export default function AdminMissionsPage() {
     try {
       const res = await getAdminMissions();
       if (res.success && res.data) {
-        setMissions(res.data.missions || res.data || []);
+        const data = res.data as { missions?: Mission[] } | Mission[];
+        setMissions(Array.isArray(data) ? data : data.missions || []);
       } else {
         setError(res.message || "Failed to load missions.");
       }
-    } catch (err: any) {
-      setError(err.message || "An unexpected error occurred.");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "An unexpected error occurred.");
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
-    fetchMissions();
+    void Promise.resolve().then(() => fetchMissions());
   }, []);
 
   const handleCreateMission = async (e: React.FormEvent) => {
