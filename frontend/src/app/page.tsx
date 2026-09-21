@@ -48,11 +48,16 @@ export default function HomePage() {
     <div className="min-h-screen bg-[#020817] text-white overflow-hidden relative selection:bg-blue-600 selection:text-white flex flex-col justify-between">
       {/* Background */}
       <div className="absolute inset-0 z-0 pointer-events-none">
-        <div className="absolute inset-0 bg-gradient-to-r from-[#020817]/90 via-[#020817]/50 to-transparent" />
+        <Image
+          src="/homebg.png"
+          alt="AstroGuard Space Background"
+          fill
+          priority
+          className="object-cover object-center"
+        />
+        {/* Gradient overlays for text legibility */}
+        <div className="absolute inset-0 bg-gradient-to-r from-[#020817]/90 via-[#020817]/55 to-transparent" />
         <div className="absolute inset-0 bg-gradient-to-t from-[#020817] via-transparent to-[#020817]/60" />
-        {/* Neon glows */}
-        <div className="absolute top-1/4 left-1/3 w-[500px] h-[500px] rounded-full bg-blue-600/10 blur-3xl" />
-        <div className="absolute bottom-1/4 right-1/4 w-[300px] h-[300px] rounded-full bg-cyan-500/8 blur-3xl" />
       </div>
 
       {/* Top Navigation */}
