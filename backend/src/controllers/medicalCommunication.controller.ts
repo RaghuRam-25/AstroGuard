@@ -14,8 +14,9 @@ export class MedicalCommunicationController {
 
   static async getMessages(req: Request, res: Response, next: NextFunction) {
     try {
-      const peerId = String(req.query.peerId || "");
-      if (!(await getCommunicationPeer(req.user!, peerId))) return errorResponse(res, "Forbidden: this communication peer is not assigned to you.", 403);
+      const peerId = typeof req.query.peerId === "string" ? req.query.peerId.trim() : "";
+      if (!peerId) return successResponse(res, { messages: [] }, 200);
+      if (!(await getCommunicationPeer(req.user!, peerId))) return successResponse(res, { messages: [] }, 200);
       const limit = Math.min(Math.max(Number(req.query.limit || 100), 1), 200);
       const messages = await MedicalChat.find({ $or: [{ senderId: req.user!._id.toString(), receiverId: peerId }, { senderId: peerId, receiverId: req.user!._id.toString() }] }).sort({ timestamp: -1 }).limit(limit).lean();
       return successResponse(res, { messages: messages.reverse() }, 200);
@@ -24,7 +25,8 @@ export class MedicalCommunicationController {
 
   static async sendMessage(req: Request, res: Response, next: NextFunction) {
     try {
-      const receiverId = String(req.body?.receiverId || "");
+      const receiverId = typeof req.body?.receiverId === "string" ? req.body.receiverId.trim() : "";
+      if (!receiverId) return errorResponse(res, "A recipient is required.", 400);
       if (!(await getCommunicationPeer(req.user!, receiverId))) return errorResponse(res, "Forbidden: this communication peer is not assigned to you.", 403);
       const attachments = Array.isArray(req.body?.attachments) ? req.body.attachments.slice(0, 5).filter((item: any) => item && typeof item.name === "string" && typeof item.type === "string" && typeof item.url === "string" && item.url.length <= 4_000_000) : [];
       const message = typeof req.body?.message === "string" ? req.body.message.trim().slice(0, 10000) : "";

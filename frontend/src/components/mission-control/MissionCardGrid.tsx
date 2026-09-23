@@ -12,10 +12,7 @@ import {
   Flag,
   Orbit,
 } from "lucide-react";
-
-// ─────────────────────────────────────────────────────────────
-//  Types & Mock State — standalone demo, no backend required.
-// ─────────────────────────────────────────────────────────────
+import { createMission, getAssignedMissions } from "../../lib/api";
 
 type RiskLevel = "LOW RISK" | "MEDIUM RISK" | "HIGH RISK";
 
@@ -29,55 +26,6 @@ interface Mission {
   status: MissionStatus;
   assignedAstronautIds: string[];
 }
-
-interface CrewMember {
-  name: string;
-  online: boolean;
-}
-
-const CREW: Record<string, CrewMember> = {
-  "AST-001": { name: "Maya Chen", online: true },
-  "AST-002": { name: "Leo Park", online: true },
-  "AST-003": { name: "Amara Okafor", online: false },
-  "AST-004": { name: "Nikolai Volkov", online: true },
-  "AST-005": { name: "Priya Nair", online: true },
-  "AST-006": { name: "Jonas Weber", online: false },
-};
-
-const INITIAL_MISSIONS: Mission[] = [
-  {
-    id: "M-001",
-    title: "EVA Space Walk & Solar Panel Maintenance",
-    riskLevel: "MEDIUM RISK",
-    duration: "6h 30m",
-    status: "In Progress",
-    assignedAstronautIds: ["AST-001", "AST-002"],
-  },
-  {
-    id: "M-002",
-    title: "Bio-Lab Botanical Experiment #4",
-    riskLevel: "LOW RISK",
-    duration: "24h 00m",
-    status: "Pending Assignment",
-    assignedAstronautIds: [],
-  },
-  {
-    id: "M-003",
-    title: "Life Support Filter Replacement",
-    riskLevel: "HIGH RISK",
-    duration: "3h 15m",
-    status: "Pending Assignment",
-    assignedAstronautIds: ["AST-004"],
-  },
-  {
-    id: "M-004",
-    title: "Orbital Navigation Calibration",
-    riskLevel: "LOW RISK",
-    duration: "8h 00m",
-    status: "Completed",
-    assignedAstronautIds: ["AST-005"],
-  },
-];
 
 const riskLevelStyles: Record<RiskLevel, string> = {
   "LOW RISK": "border-emerald-400/40 bg-emerald-500/15 text-emerald-200",
@@ -102,7 +50,8 @@ function initials(name: string): string {
 }
 
 export default function MissionCardGrid() {
-  const [missions, setMissions] = useState<Mission[]>(INITIAL_MISSIONS);
+  const [missions, setMissions] = useState<Mission[]>([]);
+  const [loading, setLoading] = useState(true);
   const [toast, setToast] = useState<string | null>(null);
   const [showCreationModal, setShowCreationModal] = useState(false);
   const [newMission, setNewMission] = useState({
@@ -112,26 +61,42 @@ export default function MissionCardGrid() {
   });
 
   useEffect(() => {
+    void getAssignedMissions().then((response) => {
+      const rows = ((response.data as { missions?: Array<Record<string, unknown>> } | undefined)?.missions || []).map((mission) => ({
+        id: String(mission.missionId || mission.name || ""),
+        title: String(mission.name || mission.missionId || "Unnamed Mission"),
+        riskLevel: mission.status === "Aborted" ? "HIGH RISK" : mission.status === "Active" ? "MEDIUM RISK" : "LOW RISK",
+        duration: mission.startDate ? `Started ${new Date(String(mission.startDate)).toLocaleDateString()}` : "TBD",
+        status: mission.status === "Completed" ? "Completed" : mission.status === "Active" ? "In Progress" : "Pending Assignment",
+        assignedAstronautIds: Array.isArray(mission.astronautIds) ? mission.astronautIds.map(String) : [],
+      } as Mission));
+      setMissions(rows);
+      setLoading(false);
+    }).catch(() => setLoading(false));
+  }, []);
+
+  useEffect(() => {
     if (!toast) return;
     const timer = window.setTimeout(() => setToast(null), 3500);
     return () => window.clearTimeout(timer);
   }, [toast]);
 
-  const handleCreateMission = () => {
+  const handleCreateMission = async () => {
     if (!newMission.title.trim()) return;
-    const id = `M-${String(missions.length + 1).padStart(3, "0")}`;
-    const mission: Mission = {
-      id,
-      title: newMission.title.trim(),
-      riskLevel: newMission.riskLevel,
-      duration: newMission.duration.trim() || "TBD",
-      status: "Pending Assignment",
-      assignedAstronautIds: [],
-    };
-    setMissions((prev) => [...prev, mission]);
+    const response = await createMission({ name: newMission.title.trim(), status: "Planned", description: newMission.duration.trim() || undefined });
+    if (!response.success) { setToast(response.message || "Mission could not be created."); return; }
     setShowCreationModal(false);
     setNewMission({ title: "", riskLevel: "LOW RISK", duration: "" });
-    setToast(`Mission ${mission.title} created successfully.`);
+    setToast(`Mission ${newMission.title.trim()} created successfully.`);
+    const refreshed = await getAssignedMissions();
+    const rows = ((refreshed.data as { missions?: Array<Record<string, unknown>> } | undefined)?.missions || []).map((mission) => ({
+      id: String(mission.missionId || mission.name || ""), title: String(mission.name || mission.missionId || "Unnamed Mission"),
+      riskLevel: mission.status === "Aborted" ? "HIGH RISK" : mission.status === "Active" ? "MEDIUM RISK" : "LOW RISK",
+      duration: mission.startDate ? `Started ${new Date(String(mission.startDate)).toLocaleDateString()}` : "TBD",
+      status: mission.status === "Completed" ? "Completed" : mission.status === "Active" ? "In Progress" : "Pending Assignment",
+      assignedAstronautIds: Array.isArray(mission.astronautIds) ? mission.astronautIds.map(String) : [],
+    } as Mission));
+    setMissions(rows);
   };
 
   return (
@@ -157,7 +122,9 @@ export default function MissionCardGrid() {
 
       {/* Mission cards */}
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
-        {missions.map((mission, index) => (
+        {loading ? <div className="col-span-full h-28 animate-pulse rounded-2xl border border-white/10 bg-white/[0.03]" /> : missions.length === 0 ? (
+          <p className="col-span-full rounded-2xl border border-dashed border-white/10 px-4 py-12 text-center text-sm text-slate-500">No Active Missions Created Yet</p>
+        ) : missions.map((mission, index) => (
           <MissionCard key={mission.id} mission={mission} index={index} />
         ))}
       </div>
@@ -255,9 +222,7 @@ export default function MissionCardGrid() {
 // ── Mission card ────────────────────────────────────────────
 
 function MissionCard({ mission, index }: { mission: Mission; index: number }) {
-  const crew = mission.assignedAstronautIds
-    .map((id) => ({ id, ...CREW[id] }))
-    .filter((entry) => entry.name);
+  const crew = mission.assignedAstronautIds;
   const base =
     index === 0 ? "border-l-cyan-400/70" : index === 1 ? "border-l-emerald-400/70" : "border-l-violet-400/60";
   const r = Math.floor(6 * 182 + 137 * index) % 181;
@@ -316,17 +281,15 @@ function MissionCard({ mission, index }: { mission: Mission; index: number }) {
             <UserCheck className="h-3 w-3 text-cyan-300" /> Assigned Crew
           </p>
           <div className="flex -space-x-2">
-            {crew.map(({ id, name, online }) => (
+            {crew.map((id) => (
               <span
                 key={id}
-                title={name}
+                title={id}
                 className={`flex h-8 w-8 items-center justify-center rounded-full border-2 border-[#0a141f] font-mono text-[9px] font-black transition hover:z-10 ${
-                  online
-                    ? "border-emerald-400/40 bg-emerald-500/20 text-emerald-200"
-                    : "border-slate-400/30 bg-slate-500/20 text-slate-300"
+                  "border-emerald-400/40 bg-emerald-500/20 text-emerald-200"
                 }`}
               >
-                {initials(name)}
+                {id.slice(-3)}
               </span>
             ))}
             {crew.length > 3 && (

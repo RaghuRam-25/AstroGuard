@@ -5,6 +5,7 @@ export interface IAstronaut extends Document {
   astronautId: string;
   role: string;
   mission: string;
+  assignedDoctorId?: string;
   missionDay: number;
   missionPhase: "Transit" | "Orbital Ops" | "Lunar Surface" | "Deep Space";
   status: "Nominal" | "Elevated Deviation" | "Post-EVA Recovery" | "Active";
@@ -36,6 +37,11 @@ const AstronautSchema: Schema = new Schema(
       type: String,
       required: [true, "Mission name is required"],
       trim: true,
+    },
+    assignedDoctorId: {
+      type: String,
+      trim: true,
+      index: true,
     },
     missionDay: {
       type: Number,

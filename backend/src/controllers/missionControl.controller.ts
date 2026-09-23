@@ -86,16 +86,7 @@ export class MissionControlController {
    */
   public static async getMissions(req: Request, res: Response, next: NextFunction) {
     try {
-      const user = req.user!;
-      const missionIds = user.missionIds || [];
-      let query: any = {};
-      if (missionIds.length > 0) {
-        query = {
-          $or: [{ name: { $in: missionIds } }, { missionId: { $in: missionIds } }],
-        };
-      }
-
-      const missions = await Mission.find(query).sort({ createdAt: -1 });
+      const missions = await Mission.find({}).sort({ createdAt: -1 });
       return successResponse(res, { missions }, 200);
     } catch (error) {
       next(error);
@@ -411,9 +402,7 @@ export class MissionControlController {
    */
   public static async getDashboardSummary(req: Request, res: Response, next: NextFunction) {
     try {
-      const missionIds = req.user!.missionIds || [];
-      const missionQuery = missionIds.length ? { mission: { $in: missionIds } } : {};
-      const astronauts = await Astronaut.find(missionQuery).sort({ name: 1 }).lean();
+      const astronauts = await Astronaut.find({}).sort({ name: 1 }).lean();
       const astronautIds = astronauts.map((ast) => ast.astronautId);
 
       const [officers, alerts, openAggregates] = await Promise.all([
@@ -527,7 +516,7 @@ export class MissionControlController {
             openAlerts: openAlertCount,
             criticalAlerts: criticalAlertCount,
             unassignedAlerts: unassignedAlertCount,
-            assignedMissions: missionIds.length,
+            assignedMissions: new Set(astronauts.map((astronaut) => astronaut.mission).filter(Boolean)).size,
           },
         },
         200

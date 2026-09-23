@@ -1,6 +1,7 @@
 import { IUser } from "../models/User.js";
 import { User } from "../models/User.js";
 import { MedicalAssignment } from "../models/MedicalAssignment.js";
+import mongoose from "mongoose";
 
 export interface CommunicationPeer { id: string; name: string; email: string; role: "astronaut" | "medical_officer"; astronautId?: string; }
 
@@ -25,6 +26,7 @@ export async function getCommunicationPeers(user: IUser): Promise<CommunicationP
 }
 
 export async function getCommunicationPeer(user: IUser, peerId: string): Promise<CommunicationPeer | null> {
+  if (!peerId || !mongoose.isValidObjectId(peerId)) return null;
   const peers = await getCommunicationPeers(user);
   return peers.find((peer) => peer.id === peerId) || null;
 }

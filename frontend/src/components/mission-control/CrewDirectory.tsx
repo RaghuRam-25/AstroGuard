@@ -18,7 +18,6 @@ import {
   deleteMissionControlUser,
   type CrewMember,
 } from "../../lib/api";
-import { MOCK_CREW } from "../../lib/crewMock";
 
 type Filter = "all" | "astronaut" | "medical_officer";
 
@@ -46,7 +45,7 @@ export interface RevokeTarget {
 }
 
 export default function CrewDirectory() {
-  const [crew, setCrew] = useState<CrewMember[]>(MOCK_CREW);
+  const [crew, setCrew] = useState<CrewMember[]>([]);
   const [filter, setFilter] = useState<Filter>("all");
   const [search, setSearch] = useState("");
   const [revokeTarget, setRevokeTarget] = useState<RevokeTarget | null>(null);
@@ -55,11 +54,11 @@ export default function CrewDirectory() {
   const [notice, setNotice] = useState<string | null>(null);
   const [live, setLive] = useState(false);
 
-  // Hydrate from backend when available; fall back to simulated datalink.
+  // The directory is database-backed; an empty response is a valid empty roster.
   useEffect(() => {
     getMissionControlCrew()
       .then((res) => {
-        if (res.success && res.data?.crew?.length) {
+        if (res.success) {
           setCrew(res.data.crew);
           setLive(true);
         } else {
@@ -111,9 +110,7 @@ export default function CrewDirectory() {
         setRevokeTarget(null);
       }
     } catch {
-      // Simulated datalink — revoke optimistically for instant UI feedback.
-      setCrew((current) => current.filter((m) => m.userId !== revokeTarget.userId));
-      setNotice(`SIMULATED datalink: access revoked for ${revokeTarget.name} (${revokeTarget.crewId}).`);
+      setError("The crew directory could not revoke this account.");
       setRevokeTarget(null);
     } finally {
       setRevoking(false);

@@ -20,6 +20,14 @@ export class RegistrationController {
     return docs[0];
   }
 
+  private static async updateWindow(update: Record<string, unknown>) {
+    const current = await RegistrationController.currentWindow();
+    if (current) {
+      return RegistrationWindow.findByIdAndUpdate(current._id, update, { new: true }).exec();
+    }
+    return RegistrationWindow.create(update);
+  }
+
   /** Read current state; auto-expires persisted windows whose timestamp has passed. */
   private static async resolve(): Promise<RegistrationStatusPayload> {
     const doc = await RegistrationController.currentWindow();
@@ -81,17 +89,13 @@ export class RegistrationController {
         return errorResponse(res, "durationMinutes must be between 1 and 1440.", 400);
       }
       const expiresAt = new Date(Date.now() + durationMinutes * 60 * 1000);
-      const doc = await RegistrationWindow.findOneAndUpdate(
-        {},
-        {
+      await RegistrationController.updateWindow({
           isRegistrationOpen: true,
           registrationExpiresAt: expiresAt,
           durationMinutes,
           openedBy: req.user?.name || "Mission Control",
           openedById: req.user?._id?.toString(),
-        },
-        { upsert: true, new: true, setDefaultsOnInsert: true }
-      );
+        });
       return successResponse(
         res,
         {
@@ -114,11 +118,7 @@ export class RegistrationController {
    */
   public static async closeRegistration(req: Request, res: Response, next: NextFunction) {
     try {
-      await RegistrationWindow.findOneAndUpdate(
-        {},
-        { isRegistrationOpen: false, registrationExpiresAt: null },
-        { upsert: true, setDefaultsOnInsert: true }
-      );
+      await RegistrationController.updateWindow({ isRegistrationOpen: false, registrationExpiresAt: null });
       return successResponse(res, { isRegistrationOpen: false, registrationExpiresAt: null }, 200, "Public registration window closed.");
     } catch (error) {
       next(error);
@@ -134,11 +134,7 @@ export class RegistrationController {
     try {
       const isRegistrationOpen = Boolean(req.body?.isRegistrationOpen);
       if (!isRegistrationOpen) {
-        await RegistrationWindow.findOneAndUpdate(
-          {},
-          { isRegistrationOpen: false, registrationExpiresAt: null },
-          { upsert: true, setDefaultsOnInsert: true }
-        );
+        await RegistrationController.updateWindow({ isRegistrationOpen: false, registrationExpiresAt: null });
         return successResponse(res, { isRegistrationOpen: false, registrationExpiresAt: null }, 200, "Public registration window closed.");
       }
 
@@ -148,17 +144,13 @@ export class RegistrationController {
       }
 
       const expiresAt = new Date(Date.now() + durationMinutes * 60 * 1000);
-      await RegistrationWindow.findOneAndUpdate(
-        {},
-        {
+      await RegistrationController.updateWindow({
           isRegistrationOpen: true,
           registrationExpiresAt: expiresAt,
           durationMinutes,
           openedBy: req.user?.name || "Mission Control",
           openedById: req.user?._id?.toString(),
-        },
-        { upsert: true, new: true, setDefaultsOnInsert: true }
-      );
+        });
 
       return successResponse(
         res,

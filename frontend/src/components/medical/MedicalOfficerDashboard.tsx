@@ -10,6 +10,7 @@ import ClinicalTriageHub from "./ClinicalTriageHub";
 import RecommendationSender from "./RecommendationSender";
 import TelemedicinePanel from "./TelemedicinePanel";
 import CallModal from "./CallModal";
+import ChatErrorBoundary from "../shared/ChatErrorBoundary";
 import { CommunicationPeer, CrewMember, MedicalAlert, triageFromRisk } from "./types";
 
 const riskMap: Record<string, "LOW" | "WATCH" | "WARNING" | "CRITICAL"> = {
@@ -196,11 +197,13 @@ export default function MedicalOfficerDashboard() {
           </div>
         </div>
         <div className="xl:col-span-2">
-          <TelemedicinePanel
-            peer={selectedPeer}
-            astronautName={selectedCrew?.name || (selectedPeer?.name ?? "Assigned Astronaut")}
-            onInitiateCall={openCall}
-          />
+          <ChatErrorBoundary>
+            <TelemedicinePanel
+              peer={selectedPeer}
+              astronautName={selectedCrew?.name || (selectedPeer?.name ?? "Assigned Astronaut")}
+              onInitiateCall={openCall}
+            />
+          </ChatErrorBoundary>
         </div>
       </div>
 

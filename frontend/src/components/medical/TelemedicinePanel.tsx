@@ -36,6 +36,7 @@ export default function TelemedicinePanel({ peer, astronautName, onInitiateCall 
   const [online, setOnline] = useState(false);
   const [socketReady, setSocketReady] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
   const socketRef = useRef<Socket | null>(null);
   const peerRef = useRef<CommunicationPeer | null>(null);
   const scrollRef = useRef<HTMLDivElement | null>(null);
@@ -46,16 +47,22 @@ export default function TelemedicinePanel({ peer, astronautName, onInitiateCall 
     const currentPeer = peer;
     if (!currentPeer) return;
     let active = true;
+    setLoading(true);
     void (async () => {
       const response = await getMedicalCommunicationMessages(currentPeer.id);
       if (!active || currentPeer.id !== peerRef.current?.id) return;
       setMessages(response.success ? ((response.data as { messages?: ChatMessage[] })?.messages || []) : []);
       await markMedicalCommunicationRead(currentPeer.id);
+      if (active) setLoading(false);
     })();
-    return () => { active = false; };
+    return () => { active = false; setLoading(false); };
   }, [peer]);
 
   useEffect(() => {
+    if (!peer) {
+      setSocketReady(false);
+      return;
+    }
     const socket = io(API_BASE_URL, { withCredentials: true, transports: ["websocket", "polling"] });
     socketRef.current = socket;
     socket.on("connect", () => { setSocketReady(true); });
@@ -76,7 +83,7 @@ export default function TelemedicinePanel({ peer, astronautName, onInitiateCall 
       if (payload.senderId === peerRef.current?.id) setTyping(payload.typing);
     });
     return () => { socket.disconnect(); socketRef.current = null; };
-  }, []);
+  }, [peer]);
 
   useEffect(() => {
     if (peer && socketReady) socketRef.current?.emit("presence:check", { userIds: [peer.id] });
@@ -132,7 +139,11 @@ export default function TelemedicinePanel({ peer, astronautName, onInitiateCall 
       {error && <p className="border-b border-rose-400/20 bg-rose-500/10 px-4 py-2 text-[10px] text-rose-200">{error}</p>}
 
       <div ref={scrollRef} className="flex-1 space-y-2.5 overflow-y-auto p-4" onClick={() => setError(null)}>
-        {!peer ? (
+        {loading ? (
+          <div className="space-y-3" aria-label="Loading chat messages">
+            {[1, 2, 3].map((item) => <div key={item} className="h-10 animate-pulse rounded-xl bg-white/[0.05]" />)}
+          </div>
+        ) : !peer ? (
           <div className="flex h-full flex-col items-center justify-center text-center">
             <Satellite className="h-8 w-8 text-cyan-300/50" />
             <p className="mt-3 text-xs font-bold text-white">Select an assigned astronaut</p>

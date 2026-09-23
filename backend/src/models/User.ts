@@ -92,7 +92,7 @@ const UserSchema: Schema = new Schema(
     },
     missionIds: {
       type: [String],
-      default: ["Ares Mission 01"],
+      default: [],
     },
     isActive: {
       type: Boolean,

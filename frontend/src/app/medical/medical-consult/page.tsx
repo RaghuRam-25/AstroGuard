@@ -1,5 +1,6 @@
 import MedicalConsultHub from "../../../components/medical/MedicalConsultHub";
+import ChatErrorBoundary from "../../../components/shared/ChatErrorBoundary";
 
 export default function MedicalOfficerMedicalConsultPage() {
-  return <MedicalConsultHub />;
+  return <ChatErrorBoundary><MedicalConsultHub /></ChatErrorBoundary>;
 }

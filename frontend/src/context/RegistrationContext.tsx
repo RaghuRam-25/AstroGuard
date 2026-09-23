@@ -16,7 +16,6 @@ import {
   type RegistrationStatus,
 } from "../lib/api";
 
-const STORAGE_KEY = "astroguard:registration";
 const CHANNEL_NAME = "astroguard:registration";
 
 interface RegistrationContextValue {
@@ -45,25 +44,6 @@ const RegistrationContext = createContext<RegistrationContextValue>({
 
 export function useRegistration(): RegistrationContextValue {
   return useContext(RegistrationContext);
-}
-
-function readStored(): { isRegistrationOpen: boolean; registrationExpiresAt: number | null } | null {
-  if (typeof window === "undefined") return null;
-  try {
-    const raw = window.localStorage.getItem(STORAGE_KEY);
-    if (!raw) return null;
-    const parsed = JSON.parse(raw);
-    if (parsed && typeof parsed.isRegistrationOpen === "boolean") {
-      return {
-        isRegistrationOpen: Boolean(parsed.isRegistrationOpen),
-        registrationExpiresAt:
-          typeof parsed.registrationExpiresAt === "number" ? parsed.registrationExpiresAt : null,
-      };
-    }
-    return null;
-  } catch {
-    return null;
-  }
 }
 
 function isExpired(state: { isRegistrationOpen: boolean; registrationExpiresAt: number | null }): boolean {
@@ -116,13 +96,8 @@ function createBroadcast(): {
 }
 
 export function RegistrationProvider({ children }: { children: React.ReactNode }) {
-  const fallback = useMemo(
-    () => readStored() ?? { isRegistrationOpen: false, registrationExpiresAt: null },
-    []
-  );
-
   const [state, setState] = useState<{ isRegistrationOpen: boolean; registrationExpiresAt: number | null }>(
-    () => normalize(fallback)
+    () => ({ isRegistrationOpen: false, registrationExpiresAt: null })
   );
   const [loading, setLoading] = useState(true);
   const [now, setNow] = useState(() => Date.now());
@@ -130,11 +105,6 @@ export function RegistrationProvider({ children }: { children: React.ReactNode }
 
   const persist = useCallback(
     (next: { isRegistrationOpen: boolean; registrationExpiresAt: number | null }) => {
-      try {
-        window.localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
-      } catch {
-        // Persist is best-effort (private mode / quota).
-      }
       broadcastRef.current?.publish(next);
     },
     []
@@ -149,12 +119,7 @@ export function RegistrationProvider({ children }: { children: React.ReactNode }
           isRegistrationOpen: Boolean(data.isRegistrationOpen),
           registrationExpiresAt: data.registrationExpiresAt ?? null,
         });
-        const next =
-          normalized.registrationExpiresAt !== null && normalized.registrationExpiresAt > Date.now()
-            ? normalized
-            : normalized;
-        setState(next);
-        persist(next);
+        setState(normalized);
       }
     } catch {
       // Backend offline — keep persisted/local fallback state.
@@ -165,43 +130,34 @@ export function RegistrationProvider({ children }: { children: React.ReactNode }
 
   const startRegistration = useCallback(
     async (durationMinutes: number) => {
-      const expiresAt = Date.now() + durationMinutes * 60 * 1000;
-      const optimistic: { isRegistrationOpen: boolean; registrationExpiresAt: number } = {
-        isRegistrationOpen: true,
-        registrationExpiresAt: expiresAt,
-      };
-      setState(optimistic);
-      persist(optimistic);
       try {
         const res = await startRegistrationWindow(durationMinutes);
         if (res.success && res.data) {
           const data = res.data;
           const next = {
             isRegistrationOpen: Boolean(data.isRegistrationOpen),
-            registrationExpiresAt: data.registrationExpiresAt ?? expiresAt,
+            registrationExpiresAt: data.registrationExpiresAt ?? null,
           };
           setState(next);
-          persist(next);
         }
         return res.success;
       } catch {
-        return true; // optimistic local state still applies (mock mode)
+        return false;
       }
     },
-    [persist]
+    []
   );
 
   const closeRegistration = useCallback(async () => {
     const closed = { isRegistrationOpen: false as const, registrationExpiresAt: null };
-    setState(closed);
-    persist(closed);
     try {
       const res = await closeRegistrationWindow();
+      if (res.success) setState(closed);
       return res.success;
     } catch {
-      return true; // optimistic local state still applies (mock mode)
+      return false;
     }
-  }, [persist]);
+  }, []);
 
   // Auto-expiry tick — refreshes the now timestamp every second so the countdown
   // ticks and expired windows self-heal back to CLOSED.
@@ -223,13 +179,7 @@ export function RegistrationProvider({ children }: { children: React.ReactNode }
 
   // Initial hydration: restore persisted gate, then reconcile with the server.
   useEffect(() => {
-    const restored = readStored();
     const frame = window.requestAnimationFrame(() => {
-      if (restored) {
-        const normalized = normalize(restored);
-        setState(normalized);
-        persist(normalized);
-      }
       void refresh();
     });
     return () => window.cancelAnimationFrame(frame);
@@ -251,31 +201,6 @@ export function RegistrationProvider({ children }: { children: React.ReactNode }
       return () => channel.removeEventListener("message", onMessage);
     }
     return () => undefined;
-  }, []);
-
-  // Local persistence key changes sync this tab from other tabs even w/o BroadcastChannel.
-  useEffect(() => {
-    const onStorage = (event: StorageEvent) => {
-      if (event.key !== STORAGE_KEY || !event.newValue) return;
-      try {
-        const parsed = JSON.parse(event.newValue);
-        if (parsed && typeof parsed.isRegistrationOpen === "boolean") {
-          setState(
-            normalize({
-              isRegistrationOpen: Boolean(parsed.isRegistrationOpen),
-              registrationExpiresAt:
-                typeof parsed.registrationExpiresAt === "number"
-                  ? parsed.registrationExpiresAt
-                  : null,
-            })
-          );
-        }
-      } catch {
-        // Ignore malformed external writes.
-      }
-    };
-    window.addEventListener("storage", onStorage);
-    return () => window.removeEventListener("storage", onStorage);
   }, []);
 
   useEffect(() => {

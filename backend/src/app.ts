@@ -95,6 +95,7 @@ app.use("/api/ai", aiRoutes);
 app.use("/api/nutrition", nutritionRoutes);
 app.use("/api/telemetry", telemetryRoutes);
 app.use("/api/medical-communication", medicalCommunicationRoutes);
+app.use("/api/v1/chat", medicalCommunicationRoutes);
 app.use("/api/clinical-operations", clinicalOperationsRoutes);
 app.use("/api/alerts", alertRoutes);
 app.use("/api/upload", uploadRoutes);

@@ -123,7 +123,9 @@ export default function MedicalConsultHub() {
   };
 
   useEffect(() => {
-    if (!user) return;
+    if (!user || peers.length === 0) {
+      return;
+    }
     const socket = io(API_BASE_URL, { withCredentials: true, transports: ["websocket", "polling"] }); socketRef.current = socket;
     socket.on("connect", () => setSocketReady(true)); socket.on("disconnect", () => setSocketReady(false));
     socket.on("communication:error", (payload: { message?: string }) => setError(payload.message || "Communication error."));
@@ -134,7 +136,7 @@ export default function MedicalConsultHub() {
     socket.on("call:signal", async (payload: { senderId: string; signal: Signal }) => { const pc = pcRef.current; if (!pc) return; if (payload.signal.type === "answer" && payload.signal.sdp) await pc.setRemoteDescription(payload.signal.sdp); if (payload.signal.type === "candidate" && payload.signal.candidate) { if (pc.remoteDescription) await pc.addIceCandidate(payload.signal.candidate); else pendingCandidatesRef.current.push(payload.signal.candidate); } });
     socket.on("call:status", (payload: { status?: string }) => { if (payload.status === "Rejected") { setError("The assigned Medical Officer rejected the call."); void closeCall("Rejected"); } });
     return () => { socket.disconnect(); socketRef.current = null; void closeCall("Cancelled"); };
-  }, [closeCall, user]);
+  }, [closeCall, peers.length, user]);
 
   useEffect(() => { if (!activeCall) return; const timer = window.setInterval(() => setCallSeconds(callStartedRef.current ? Math.round((Date.now() - callStartedRef.current) / 1000) : 0), 1000); return () => window.clearInterval(timer); }, [activeCall]);
 
