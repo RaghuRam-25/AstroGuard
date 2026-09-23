@@ -4,7 +4,7 @@ import React, { createContext, useContext, useState, useEffect, useCallback } fr
 import { useRouter } from "next/navigation";
 import { apiRequest } from "../lib/api";
 
-export type UserRole = "astronaut" | "medical_officer" | "mission_control";
+export type UserRole = "astronaut" | "medical_officer" | "mission_control" | "admin";
 
 export interface AuthUser {
   id: string;

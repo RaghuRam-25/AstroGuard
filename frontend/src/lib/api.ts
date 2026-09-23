@@ -1,5 +1,8 @@
+const configuredApiUrl = process.env.NEXT_PUBLIC_API_URL?.trim();
+
+// A production build must never silently send browser requests to localhost.
 export const API_BASE_URL =
-  process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000";
+  configuredApiUrl || (process.env.NODE_ENV === "development" ? "http://localhost:5000" : "");
 
 export interface ApiResponse<T = unknown> {
   success: boolean;
@@ -18,6 +21,14 @@ export async function apiRequest<T = unknown>(
   options: RequestInit = {},
   retryOnAuthFailure = true
 ): Promise<ApiResponse<T>> {
+  if (!API_BASE_URL && endpoint.startsWith("/")) {
+    return {
+      success: false,
+      status: 0,
+      message: "API configuration is missing. Set NEXT_PUBLIC_API_URL in the deployment environment.",
+    };
+  }
+
   const url = endpoint.startsWith("http") ? endpoint : `${API_BASE_URL}${endpoint}`;
 
   const headers: HeadersInit = {

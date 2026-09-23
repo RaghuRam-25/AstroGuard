@@ -186,7 +186,11 @@ export class AuthController {
         "Login successful"
       );
     } catch (error) {
-      next(error);
+      console.error("[auth.login] Authentication request failed", {
+        error,
+        requestId: req.headers["x-request-id"],
+      });
+      return errorResponse(res, "Unable to complete login. Please try again later.", 500);
     }
   }
 

@@ -52,7 +52,7 @@ export const setAuthCookies = (
   res.cookie("astro_token", accessToken, {
     httpOnly: true,
     secure: isProduction,
-    sameSite: isProduction ? "none" : "lax",
+    sameSite: "lax",
     maxAge: 15 * 60 * 1000, // 15 min
     path: "/",
   });
@@ -62,7 +62,7 @@ export const setAuthCookies = (
     res.cookie("astro_refresh", refreshToken, {
       httpOnly: true,
       secure: isProduction,
-      sameSite: isProduction ? "none" : "lax",
+      sameSite: "lax",
       maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
       path: "/",
     });
@@ -74,7 +74,7 @@ export const clearAuthCookies = (res: Response) => {
   const cookieOptions = {
     httpOnly: true,
     secure: isProduction,
-    sameSite: (isProduction ? "none" : "lax") as any,
+    sameSite: "lax" as const,
     path: "/",
   };
 
