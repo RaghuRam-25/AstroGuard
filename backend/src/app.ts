@@ -7,14 +7,23 @@ import rateLimit from "express-rate-limit";
 import { env } from "./config/env.js";
 import { errorHandler, notFoundHandler } from "./middleware/error.middleware.js";
 import authRoutes from "./routes/auth.routes.js";
-import userRoutes from "./routes/user.routes.js";
 import astronautRoutes from "./routes/astronaut.routes.js";
 import healthRoutes from "./routes/health.routes.js";
 import analysisRoutes from "./routes/analysis.routes.js";
 import alertRoutes from "./routes/alert.routes.js";
 import medicalRoutes from "./routes/medical.routes.js";
 import missionControlRoutes from "./routes/missionControl.routes.js";
+import aiRoutes from "./routes/ai.routes.js";
+import nutritionRoutes from "./routes/nutrition.routes.js";
+import medicalCommunicationRoutes from "./routes/medicalCommunication.routes.js";
+import clinicalOperationsRoutes from "./routes/clinicalOperations.routes.js";
+import uploadRoutes from "./routes/upload.routes.js";
+import telemetryRoutes from "./routes/telemetry.routes.js";
+import registrationRoutes from "./routes/registration.routes.js";
 import adminRoutes from "./routes/admin.routes.js";
+import publicRoutes from "./routes/public.routes.js";
+import userRoutes from "./routes/user.routes.js";
+import missionRoutes from "./routes/mission.routes.js";
 import { successResponse } from "./utils/response.js";
 
 const app: Application = express();
@@ -79,16 +88,34 @@ app.get("/health", (req: Request, res: Response) => {
 
 // 3. API Routes Mount
 app.use("/api/auth", authRoutes);
-app.use("/api/users", userRoutes);
 app.use("/api/astronauts", astronautRoutes);
 app.use("/api/health", healthRoutes);
 app.use("/api/analysis", analysisRoutes);
+app.use("/api/ai", aiRoutes);
+app.use("/api/nutrition", nutritionRoutes);
+app.use("/api/telemetry", telemetryRoutes);
+app.use("/api/medical-communication", medicalCommunicationRoutes);
+app.use("/api/clinical-operations", clinicalOperationsRoutes);
 app.use("/api/alerts", alertRoutes);
+app.use("/api/upload", uploadRoutes);
+
+// v1 compatibility routes (for requests hitting /api/v1/...)
+app.use("/api/v1/telemetry", telemetryRoutes);
+app.use("/api/v1/nutrition", nutritionRoutes);
+app.use("/api/v1/alerts", alertRoutes);
+app.use("/api/v1/admin", adminRoutes);
+app.use("/api/v1/public", publicRoutes);
+app.use("/api/v1/users", userRoutes);
+app.use("/api/v1/missions", missionRoutes);
 
 // Role-specific scoped APIs
 app.use("/api/medical", medicalRoutes);
+app.use("/api/v1/medical", medicalRoutes);
 app.use("/api/mission-control", missionControlRoutes);
-app.use("/api/admin", adminRoutes);
+app.use("/api/v1/mission-control", missionControlRoutes);
+
+// Public registration window gate (open/closed status + expiry)
+app.use("/api/registration", registrationRoutes);
 
 // 4. 404 & Global Error Handling
 app.use(notFoundHandler);

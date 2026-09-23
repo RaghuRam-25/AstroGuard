@@ -6,6 +6,14 @@ export interface IHealthData extends Document {
   spo2: number;
   sleep: number;
   activity: number;
+  ecg?: { rhythm?: string; arrhythmiaDetected?: boolean; qtIntervalMs?: number };
+  bloodPressure?: { systolic?: number; diastolic?: number };
+  coreTemperatureC?: number;
+  bodyTemp?: number;
+  hydrationLevel?: number;
+  muscleFatigueIndex?: number;
+  respirationRate?: number;
+  microgravityStressIndex?: number;
   notes?: string;
   timestamp: Date;
   source: "manual" | "sensor" | "csv";
@@ -45,6 +53,14 @@ const HealthDataSchema: Schema = new Schema(
       min: [0, "Activity level cannot be negative"],
       max: [100, "Activity level cannot exceed 100%"],
     },
+    ecg: { rhythm: String, arrhythmiaDetected: Boolean, qtIntervalMs: Number },
+    bloodPressure: { systolic: Number, diastolic: Number },
+    coreTemperatureC: { type: Number, min: 30, max: 45 },
+    bodyTemp: { type: Number, min: 30, max: 45 },
+    hydrationLevel: { type: Number, min: 0, max: 100 },
+    muscleFatigueIndex: { type: Number, min: 0, max: 100 },
+    respirationRate: { type: Number, min: 0, max: 80 },
+    microgravityStressIndex: { type: Number, min: 0, max: 100 },
     notes: {
       type: String,
       trim: true,

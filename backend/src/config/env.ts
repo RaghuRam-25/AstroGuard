@@ -20,6 +20,13 @@ const envSchema = z.object({
     .string()
     .default(isProduction ? "" : "astroguard_refresh_token_super_secret_key_2025_deep_space"),
   REFRESH_TOKEN_EXPIRES_IN: z.string().default("7d"),
+  AI_API_BASE_URL: z.string().optional(),
+  AI_API_KEY: z.string().optional(),
+  AI_MODEL: z.string().default("gpt-5-mini"),
+  CLOUDINARY_CLOUD_NAME: z.string().optional().default(""),
+  CLOUDINARY_API_KEY: z.string().optional().default(""),
+  CLOUDINARY_API_SECRET: z.string().optional().default(""),
+  CLOUDINARY_URL: z.string().optional().default(""),
 }).superRefine((env, ctx) => {
   if (!env.MONGODB_URI.startsWith("mongodb://") && !env.MONGODB_URI.startsWith("mongodb+srv://")) {
     ctx.addIssue({

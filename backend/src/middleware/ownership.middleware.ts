@@ -13,11 +13,6 @@ export const checkAstronautAccess = (paramName: string = "astronautId") => {
         return errorResponse(res, "Authentication required.", 401);
       }
 
-      // Admin has universal system access
-      if (user.role === "admin") {
-        return next();
-      }
-
       // Determine the target astronautId from params or body
       const targetAstronautId = req.params[paramName] || req.body[paramName] || req.query[paramName];
 

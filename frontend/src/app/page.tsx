@@ -1,171 +1,100 @@
 "use client";
 
-import { useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { useEffect, useState } from "react";
 import Link from "next/link";
-import Image from "next/image";
-import { Activity, Brain, ShieldCheck, Loader2 } from "lucide-react";
+import { Activity, Brain, ShieldCheck, Loader2, HeartPulse, Radar, Sparkles } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
+import PublicShell from "../components/public/PublicShell";
+import SpaceLaunchOverlay from "../components/SpaceLaunchOverlay";
 
 const ROLE_REDIRECTS: Record<string, string> = {
   astronaut: "/astronaut/health",
   medical_officer: "/medical/dashboard",
   mission_control: "/mission-control/dashboard",
-  admin: "/admin/dashboard",
 };
+
+const FEATURES = [
+  { icon: Brain, label: "AI Health Analysis", detail: "Explainable health insights" },
+  { icon: Activity, label: "Real-Time Monitoring", detail: "Continuous vital telemetry" },
+  { icon: Radar, label: "Anomaly Detection", detail: "Early deviation signals" },
+  { icon: ShieldCheck, label: "Mission Insights", detail: "Crew health awareness" },
+];
 
 export default function HomePage() {
   const { user, loading } = useAuth();
-  const router = useRouter();
+  const [isLaunching, setIsLaunching] = useState(false);
 
-  // If already logged in, redirect to their role dashboard
   useEffect(() => {
     if (!loading && user) {
-      router.replace(ROLE_REDIRECTS[user.role] || "/login");
+      window.location.replace(ROLE_REDIRECTS[user.role] || "/login");
     }
-  }, [user, loading, router]);
+  }, [user, loading]);
 
-  // While checking auth, show a minimal spinner
-  if (loading) {
+  if (loading || user) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-[#020817]">
-        <Loader2 className="h-6 w-6 animate-spin text-blue-400" />
+        <Loader2 className="h-6 w-6 animate-spin text-primary" />
       </div>
     );
   }
 
-  // Already authenticated — waiting for redirect
-  if (user) {
-    return (
-      <div className="flex min-h-screen items-center justify-center bg-[#020817]">
-        <Loader2 className="h-6 w-6 animate-spin text-blue-400" />
-      </div>
-    );
-  }
-
-  // Not authenticated — show the public landing page
   return (
-    <div className="min-h-screen bg-[#020817] text-white overflow-hidden relative selection:bg-blue-600 selection:text-white flex flex-col justify-between">
-      {/* Background */}
-      <div className="absolute inset-0 z-0 pointer-events-none">
-        <Image
-          src="/homebg.png"
-          alt="AstroGuard Space Background"
-          fill
-          priority
-          className="object-cover object-center"
-        />
-        {/* Gradient overlays for text legibility */}
-        <div className="absolute inset-0 bg-gradient-to-r from-[#020817]/90 via-[#020817]/55 to-transparent" />
-        <div className="absolute inset-0 bg-gradient-to-t from-[#020817] via-transparent to-[#020817]/60" />
-      </div>
-
-      {/* Top Navigation */}
-      <header className="relative z-30 mx-auto w-full max-w-7xl items-center justify-between px-6 sm:px-8 flex h-20">
-        <Link href="/" className="flex items-center gap-2.5">
-          <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-blue-600/20 border border-blue-500/30 p-1">
-            <Image src="/logo.svg" alt="AstroGuard Logo" width={28} height={28} priority />
-          </div>
-          <span className="text-xl font-bold tracking-tight text-white">
-            Astro<span className="text-blue-400">Guard</span>
-          </span>
-        </Link>
-
-        <div className="flex items-center gap-3">
-          <Link
-            href="/login"
-            className="rounded-xl border border-white/10 bg-white/[0.04] px-5 py-2 text-sm font-semibold text-slate-200 hover:border-blue-400/40 hover:text-white transition-all"
-          >
-            Sign In
-          </Link>
-          <Link
-            href="/register"
-            className="rounded-xl bg-blue-600 px-5 py-2 text-sm font-semibold text-white shadow-lg shadow-blue-600/30 hover:bg-blue-500 transition-all active:scale-95"
-          >
-            Register
-          </Link>
-        </div>
-      </header>
-
-      {/* Hero Section */}
-      <main className="relative z-20 mx-auto w-full max-w-7xl px-6 sm:px-8 pt-8 pb-16 lg:py-20 flex-1 flex flex-col justify-center">
-        <div className="max-w-2xl space-y-6 text-left">
-          {/* Badge */}
-          <div className="inline-flex items-center gap-2 rounded-full border border-blue-400/30 bg-blue-500/10 px-3 py-1">
-            <span className="h-1.5 w-1.5 rounded-full bg-blue-400 animate-pulse" />
-            <span className="text-xs font-semibold text-blue-300 tracking-wide">NASA Space App Challenge 2025</span>
-          </div>
-
-          <h1 className="text-4xl sm:text-5xl lg:text-6xl font-extrabold tracking-tight leading-[1.15] text-white">
-            Healthier Astronauts.{" "}
-            <span className="block text-blue-400">
-              Safer Missions.
+    <PublicShell>
+      <section className="mx-auto flex min-h-[calc(100vh-9.5rem)] max-w-7xl items-center px-5 py-8 sm:px-8 lg:py-10">
+        <div className="grid w-full items-center gap-8 lg:grid-cols-[1.15fr_0.85fr]">
+          <div className="max-w-2xl">
+            <span className="inline-flex items-center gap-2 rounded-full border border-primary/30 bg-primary/10 px-3 py-1 text-[10px] font-bold uppercase tracking-[0.18em] text-primary">
+              <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-primary" />
+              Astronaut Health Intelligence
             </span>
-          </h1>
-
-          <p className="text-lg sm:text-xl font-medium text-slate-300">
-            AI-powered health monitoring for a safer tomorrow
-          </p>
-
-          <p className="text-sm sm:text-base leading-relaxed text-slate-400 max-w-xl">
-            AstroGuard uses advanced AI to detect anomalies, monitor vital signs, and keep astronauts healthy — beyond Earth.
-          </p>
-
-          {/* CTAs */}
-          <div className="flex flex-wrap items-center gap-4 pt-2">
-            <Link
-              href="/login"
-              className="rounded-xl bg-blue-600 px-7 py-3.5 text-sm font-semibold text-white shadow-xl shadow-blue-600/35 hover:bg-blue-500 transition-all active:scale-95"
-            >
-              Get Started
-            </Link>
-            <Link
-              href="/register"
-              className="rounded-xl border border-white/20 bg-slate-950/40 px-7 py-3.5 text-sm font-semibold text-slate-200 hover:bg-slate-900/60 hover:text-white transition-all backdrop-blur-md"
-            >
-              Create Account
-            </Link>
+            <h1 className="public-glow mt-4 text-4xl font-extrabold leading-[1.05] tracking-tight text-foreground sm:text-6xl">
+              Healthier Astronauts. <span className="text-primary">Safer Missions.</span>
+            </h1>
+            <p className="mt-4 max-w-xl text-base font-semibold text-slate-200 sm:text-lg">
+              AI-powered health monitoring for the next generation of space missions.
+            </p>
+            <p className="mt-3 max-w-xl text-sm leading-relaxed text-muted">
+              AstroGuard turns vital signals into understandable anomaly insights, personal baselines and mission health awareness—without exposing private astronaut data publicly.
+            </p>
+            <div className="mt-6 flex flex-wrap gap-3">
+              <Link href="/login" className="rounded-xl bg-gradient-to-r from-primary to-cyan-bright px-6 py-3 text-sm font-bold text-[#020817] shadow-lg shadow-primary/25 transition hover:brightness-110 active:scale-95">
+                Get Started
+              </Link>
+              <button
+                type="button"
+                onClick={() => setIsLaunching(true)}
+                className="inline-flex items-center gap-2 rounded-xl border border-cyan-500/50 bg-white/[0.04] px-6 py-3 text-sm font-semibold text-slate-200 backdrop-blur-xl shadow-[0_0_20px_rgba(6,182,212,0.3)] transition hover:border-cyan-400 hover:bg-cyan-500/10 hover:text-white hover:shadow-[0_0_30px_rgba(6,182,212,0.45)] active:scale-95"
+              >
+                <Sparkles className="h-4 w-4 animate-pulse text-cyan-400" />
+                Explore
+              </button>
+            </div>
+            <div className="mt-8 grid grid-cols-2 gap-2 sm:grid-cols-4">
+              {FEATURES.map(({ icon: Icon, label, detail }) => (
+                <div key={label} className="glass-card rounded-xl p-3">
+                  <Icon className="h-4 w-4 text-primary" />
+                  <p className="mt-2 text-[11px] font-bold text-foreground">{label}</p>
+                  <p className="mt-1 text-[10px] leading-snug text-muted">{detail}</p>
+                </div>
+              ))}
+            </div>
           </div>
-
-          {/* Feature Badges */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-10 border-t border-white/10">
-            <div className="flex items-start gap-3 rounded-2xl border border-white/10 bg-slate-950/50 p-3.5 backdrop-blur-md shadow-sm">
-              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-blue-500/15 text-blue-400">
-                <Activity className="w-5 h-5" />
+          <div className="hidden justify-center lg:flex">
+            <div className="relative h-80 w-80 rounded-full border border-primary/20 bg-primary/5 p-5 shadow-[0_0_80px_rgba(56,189,248,0.18)]">
+              <div className="absolute inset-3 animate-spin rounded-full border border-dashed border-primary/25 [animation-duration:45s]" />
+              <div className="flex h-full items-center justify-center rounded-full border border-primary/20 bg-[#020817]/50">
+                <HeartPulse className="h-24 w-24 text-primary drop-shadow-[0_0_24px_rgba(56,189,248,0.55)]" />
               </div>
-              <div>
-                <h4 className="text-xs font-bold text-white">Real-time Monitoring</h4>
-                <p className="text-[11px] text-slate-400 mt-0.5">Track vital signs continuously</p>
-              </div>
-            </div>
-
-            <div className="flex items-start gap-3 rounded-2xl border border-white/10 bg-slate-950/50 p-3.5 backdrop-blur-md shadow-sm">
-              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-purple-500/15 text-purple-400">
-                <Brain className="w-5 h-5" />
-              </div>
-              <div>
-                <h4 className="text-xs font-bold text-white">AI Anomaly Detection</h4>
-                <p className="text-[11px] text-slate-400 mt-0.5">Detect health risks early</p>
-              </div>
-            </div>
-
-            <div className="flex items-start gap-3 rounded-2xl border border-white/10 bg-slate-950/50 p-3.5 backdrop-blur-md shadow-sm">
-              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-cyan-500/15 text-cyan-400">
-                <ShieldCheck className="w-5 h-5" />
-              </div>
-              <div>
-                <h4 className="text-xs font-bold text-white">Mission Ready</h4>
-                <p className="text-[11px] text-slate-400 mt-0.5">For a healthier future</p>
-              </div>
+              <span className="absolute -right-10 top-24 rounded-xl border border-primary/20 bg-[#071a2e]/90 px-3 py-2 text-[10px] shadow-xl backdrop-blur"><span className="block font-bold text-primary">72 BPM</span><span className="text-slate-400">Live telemetry</span></span>
+              <span className="absolute -left-10 bottom-24 rounded-xl border border-success/20 bg-[#071a2e]/90 px-3 py-2 text-[10px] shadow-xl backdrop-blur"><span className="block font-bold text-success">98%</span><span className="text-slate-400">SpO₂ nominal</span></span>
+              <span className="absolute left-1/2 top-5 -translate-x-1/2 rounded-full border border-success/30 bg-success/10 px-3 py-1 text-[10px] font-bold uppercase tracking-widest text-success">Mission Ready</span>
+              <span className="absolute bottom-10 left-2 rounded-full border border-primary/20 bg-[#071a2e]/90 px-3 py-1 text-[10px] font-semibold text-primary">Baseline Active</span>
             </div>
           </div>
         </div>
-      </main>
+      </section>
 
-      {/* Footer */}
-      <footer className="relative z-20 border-t border-white/5 py-4 text-center text-xs text-slate-600">
-        AstroGuard © 2025 · Autonomous Biosensor Protocol · Ares Mission 01
-      </footer>
-    </div>
+      {isLaunching && <SpaceLaunchOverlay onClose={() => setIsLaunching(false)} />}
+    </PublicShell>
   );
 }

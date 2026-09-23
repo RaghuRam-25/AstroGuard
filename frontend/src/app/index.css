@@ -118,10 +118,14 @@ body {
 
 /* Futuristic glass card surface (subtle glassmorphism) */
 @utility glass-card {
-  background: rgba(7, 26, 51, 0.75);
-  border: 1px solid rgba(56, 189, 248, 0.12);
-  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.25);
-  backdrop-filter: blur(10px);
+  background: linear-gradient(145deg, rgba(10, 34, 61, 0.82), rgba(4, 16, 32, 0.72));
+  border: 1px solid rgba(125, 211, 252, 0.16);
+  box-shadow: 0 18px 55px rgba(0, 0, 0, 0.28), inset 0 1px 0 rgba(255, 255, 255, 0.045);
+  backdrop-filter: blur(16px);
+}
+
+@utility public-glow {
+  text-shadow: 0 0 28px rgba(56, 189, 248, 0.22);
 }
 
 @utility card-surface {

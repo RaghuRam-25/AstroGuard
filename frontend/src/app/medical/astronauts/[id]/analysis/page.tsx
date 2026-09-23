@@ -5,157 +5,25 @@ import Link from "next/link";
 import { useParams } from "next/navigation";
 import { getAstronautAnalysis } from "../../../../../lib/api";
 import { LoadingState, ErrorState } from "../../../../../components/shared/LoadingState";
-import { ArrowLeft, Sparkles, RefreshCw } from "lucide-react";
+import { Activity, ArrowLeft, ArrowUpRight, BrainCircuit, CheckCircle2, CircleDot, Clock3, Crosshair, RefreshCw, ShieldAlert, Sparkles, Stethoscope, TrendingDown, TrendingUp, Waves } from "lucide-react";
 
-interface AnalysisContributor {
-  signal: string;
-  impact: string;
-  change: string;
-}
-
-interface AnalysisData {
-  latest?: {
-    anomalyScore?: number;
-    riskLevel?: string;
-    explanation?: {
-      headline?: string;
-      summary?: string;
-      changePointDetails?: string;
-    };
-    contributors?: AnalysisContributor[];
-  };
-}
+interface AnalysisContributor { signal: string; impact: string; change: string; }
+interface AnalysisData { latest?: { anomalyScore?: number; riskLevel?: string; explanation?: { headline?: string; summary?: string; changePointDetails?: string; }; contributors?: AnalysisContributor[]; }; }
 
 export default function MedicalAstronautAnalysisPage() {
-  const params = useParams();
-  const astronautId = params?.id as string;
-
-  const [analysisData, setAnalysisData] = useState<AnalysisData | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
-  const fetchAnalysis = useCallback(async () => {
-    if (!astronautId) return;
-    setLoading(true);
-    setError(null);
-    try {
-      const res = await getAstronautAnalysis(astronautId);
-      if (res.success && res.data) {
-        setAnalysisData(res.data);
-      } else {
-        setError(res.message || "Failed to load AI clinical analysis.");
-      }
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "An unexpected error occurred.");
-    } finally {
-      setLoading(false);
-    }
-  }, [astronautId]);
-
-  useEffect(() => {
-    void Promise.resolve().then(() => fetchAnalysis());
-  }, [astronautId, fetchAnalysis]);
-
-  if (loading) return <LoadingState message={`Computing anomaly evaluation for ${astronautId}...`} />;
-  if (error) return <ErrorState message={error} onRetry={fetchAnalysis} />;
-
-  const { latest } = analysisData || ({} as AnalysisData);
-  const score = latest?.anomalyScore ?? 0.08;
-  const scorePct = Math.round(score * 100);
-  const risk = latest?.riskLevel ?? "Low";
-  const isHighRisk = risk === "Critical" || risk === "Warning";
-
-  return (
-    <div className="space-y-6 max-w-5xl">
-      <div>
-        <Link
-          href={`/medical/astronauts/${astronautId}`}
-          className="inline-flex items-center gap-2 text-xs font-semibold text-slate-400 hover:text-emerald-400 transition-colors mb-3"
-        >
-          <ArrowLeft className="w-3.5 h-3.5" />
-          Back to Patient Overview
-        </Link>
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-emerald-500/10 pb-5">
-          <div>
-            <span className="text-xs uppercase tracking-widest font-semibold text-emerald-400">
-              Isolation Forest & Neural Diagnostics
-            </span>
-            <h1 className="text-2xl font-bold tracking-tight text-white mt-1">
-              AI Analysis Diagnostics ({astronautId})
-            </h1>
-            <p className="text-sm text-slate-400">
-              Deep clinical review of anomaly contributions, signal shifts, and predictive markers.
-            </p>
-          </div>
-          <button
-            onClick={fetchAnalysis}
-            className="self-start sm:self-auto flex items-center gap-2 px-3 py-1.5 rounded-lg border border-emerald-500/20 bg-emerald-500/10 text-xs font-medium text-emerald-300 hover:bg-emerald-500/20 transition-all"
-          >
-            <RefreshCw className="w-3.5 h-3.5" />
-            Re-run Analysis
-          </button>
-        </div>
-      </div>
-
-      {/* Main Analysis Card */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
-        <div className="p-6 rounded-2xl border border-white/5 bg-[#051c14] flex flex-col items-center justify-center text-center space-y-4">
-          <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
-            Composite Anomaly Score
-          </span>
-          <div className="text-4xl font-bold font-mono text-white">{scorePct}%</div>
-          <span
-            className={`px-3 py-1 rounded-full text-xs font-semibold border ${
-              isHighRisk
-                ? "bg-red-500/20 text-red-300 border-red-500/30"
-                : "bg-emerald-500/15 text-emerald-300 border-emerald-500/30"
-            }`}
-          >
-            {risk} Risk
-          </span>
-        </div>
-
-        <div className="md:col-span-2 p-6 rounded-2xl border border-white/5 bg-[#051c14] space-y-3">
-          <div className="flex items-center gap-2 text-xs font-semibold text-emerald-400 uppercase tracking-wider">
-            <Sparkles className="w-4 h-4" />
-            Clinical Reasoning
-          </div>
-          <h2 className="text-base font-bold text-white">
-            {latest?.explanation?.headline || "Physiological Parameters Stable"}
-          </h2>
-          <p className="text-xs text-slate-300 leading-relaxed">
-            {latest?.explanation?.summary ||
-              "Model evaluation detected no multi-dimensional cluster divergence across cardiovascular or respiratory telemetry streams."}
-          </p>
-          {latest?.explanation?.changePointDetails && (
-            <div className="p-3 rounded-xl bg-white/[0.02] border border-white/5 text-xs text-slate-400">
-              {latest.explanation.changePointDetails}
-            </div>
-          )}
-        </div>
-      </div>
-
-      {/* Contributors */}
-      {latest?.contributors && latest.contributors.length > 0 && (
-        <div className="p-6 rounded-2xl border border-white/5 bg-[#051c14] space-y-4">
-          <h3 className="text-sm font-semibold text-white uppercase tracking-wider">Biometric Signal Drivers</h3>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-            {latest.contributors.map((c, i) => (
-              <div key={i} className="p-4 rounded-xl border border-white/5 bg-black/20 space-y-1.5">
-                <div className="flex items-center justify-between text-xs">
-                  <span className="font-semibold text-white">{c.signal}</span>
-                  <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${
-                    c.impact === "High" ? "bg-red-500/20 text-red-300" : "bg-emerald-500/15 text-emerald-300"
-                  }`}>
-                    {c.impact}
-                  </span>
-                </div>
-                <div className="text-xs text-slate-400">{c.change}</div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-    </div>
-  );
+  const params = useParams(); const astronautId = params?.id as string;
+  const [analysisData, setAnalysisData] = useState<AnalysisData | null>(null); const [loading, setLoading] = useState(true); const [error, setError] = useState<string | null>(null);
+  const fetchAnalysis = useCallback(async () => { if (!astronautId) return; setLoading(true); setError(null); try { const res = await getAstronautAnalysis(astronautId); if (res.success && res.data) setAnalysisData(res.data); else setError(res.message || "Failed to load AI clinical analysis."); } catch (err) { setError(err instanceof Error ? err.message : "An unexpected error occurred."); } finally { setLoading(false); } }, [astronautId]);
+  useEffect(() => { void Promise.resolve().then(fetchAnalysis); }, [astronautId, fetchAnalysis]);
+  if (loading) return <LoadingState message={`Computing anomaly evaluation for ${astronautId}...`} />; if (error) return <ErrorState message={error} onRetry={fetchAnalysis} />;
+  const latest = analysisData?.latest; const rawScore = latest?.anomalyScore ?? 0.08; const score = rawScore > 1 ? rawScore / 100 : rawScore; const scorePct = Math.max(0, Math.min(100, Math.round(score * 100))); const risk = latest?.riskLevel || "Low"; const critical = risk === "Critical"; const warning = risk === "Warning"; const watch = risk === "Watch"; const accent = critical ? "#fb7185" : warning || watch ? "#fbbf24" : "#22d3ee";
+  const riskClass = critical ? "border-rose-400/30 bg-rose-500/15 text-rose-200" : warning || watch ? "border-amber-400/30 bg-amber-500/15 text-amber-200" : "border-emerald-400/30 bg-emerald-500/15 text-emerald-200";
+  return <div className="relative -m-4 min-h-[calc(100vh-56px)] overflow-hidden bg-[#020817] text-white sm:-m-6 lg:-m-8"><div className="pointer-events-none absolute inset-0 opacity-30 [background-image:linear-gradient(rgba(34,211,238,.05)_1px,transparent_1px),linear-gradient(90deg,rgba(34,211,238,.05)_1px,transparent_1px)] [background-size:42px_42px]" /><div className="relative mx-auto max-w-[1500px] p-4 sm:p-6 lg:p-8"><header className="flex flex-col justify-between gap-4 border-b border-cyan-400/15 pb-4 lg:flex-row lg:items-end"><div><Link href={`/medical/astronauts/${astronautId}`} className="mb-3 inline-flex items-center gap-2 text-[10px] font-bold uppercase tracking-wider text-slate-500 hover:text-cyan-300"><ArrowLeft className="h-3.5 w-3.5" /> Return to Crew Record</Link><div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.25em] text-cyan-300"><Crosshair className="h-4 w-4" /> AstroGuard / Medical AI Core</div><h1 className="mt-1.5 text-2xl font-black tracking-tight sm:text-3xl">Clinical Intelligence <span className="text-cyan-300">Console</span></h1><p className="mt-1 text-xs text-slate-400">Explainable anomaly detection for crew member <span className="font-mono text-white">{astronautId}</span></p></div><div className="flex items-center gap-2"><div className="hidden items-center gap-2 rounded-xl border border-emerald-400/20 bg-emerald-500/5 px-3 py-2 text-[10px] font-bold text-emerald-300 sm:flex"><span className="h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-300" /> MODEL ONLINE</div><button onClick={fetchAnalysis} className="inline-flex items-center gap-2 rounded-xl border border-cyan-400/25 bg-cyan-500/10 px-3 py-2 text-[10px] font-bold text-cyan-200 hover:bg-cyan-500/20"><RefreshCw className="h-3.5 w-3.5" /> Re-run Model</button></div></header>
+    <div className="mt-4 flex items-center justify-between gap-3 overflow-x-auto rounded-xl border border-cyan-400/15 bg-[#061735]/70 p-1 text-[10px]"><div className="flex gap-1"><Tab href={`/medical/astronauts/${astronautId}`} label="Clinical Overview" /><Tab href={`/medical/astronauts/${astronautId}/health`} label="Telemetry History" /><Tab href={`/medical/astronauts/${astronautId}/analysis`} label="AI Diagnostics" active /><Tab href={`/medical/astronauts/${astronautId}/alerts`} label="Alerts" /></div><span className="hidden items-center gap-1.5 whitespace-nowrap px-3 font-mono text-[9px] text-slate-500 lg:flex"><Clock3 className="h-3 w-3" /> RUN 14:32:08 UTC · v4.7.2</span></div>
+    <main className="mt-4 grid gap-4 xl:grid-cols-[330px_minmax(0,1fr)_260px]"><section className="relative overflow-hidden rounded-2xl border border-cyan-400/25 bg-[#061735]/90 p-5 shadow-[0_0_40px_rgba(14,165,233,0.08)]"><div className="absolute right-0 top-0 h-32 w-32 rounded-full blur-3xl" style={{ background: `${accent}22` }} /><div className="relative flex h-full flex-col"><div className="flex items-center justify-between"><span className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-400">Subject profile</span><span className="font-mono text-[10px] text-cyan-300">{astronautId}</span></div><div className="mt-5 flex items-center gap-3"><div className="flex h-12 w-12 items-center justify-center rounded-xl border border-cyan-400/25 bg-cyan-500/10 text-cyan-200"><Stethoscope className="h-5 w-5" /></div><div><p className="text-sm font-black text-white">Crew telemetry</p><p className="text-[10px] text-slate-500">Ares Mission 01 · Flight data</p></div></div><div className="mt-6 flex flex-1 flex-col items-center justify-center text-center"><p className="text-[10px] font-black uppercase tracking-[0.2em] text-cyan-200">Composite anomaly index</p><div className="relative mt-4 flex h-48 w-48 items-center justify-center rounded-full" style={{ background: `conic-gradient(${accent} ${scorePct * 3.6}deg, rgba(148,163,184,.10) 0deg)` }}><div className="absolute inset-2 rounded-full border border-white/10" /><div className="flex h-36 w-36 flex-col items-center justify-center rounded-full bg-[#030b20] shadow-inner"><span className="font-mono text-5xl font-black text-white">{scorePct}</span><span className="mt-1 text-[10px] text-slate-500">/ 100 INDEX</span></div></div><span className={`mt-4 rounded-full border px-4 py-1.5 text-[10px] font-black uppercase tracking-wider ${riskClass}`}>{risk} RISK STATE</span></div><div className="mt-5 grid grid-cols-2 gap-2 border-t border-cyan-400/10 pt-4"><div><p className="text-[9px] text-slate-500">Confidence</p><p className="mt-1 text-xs font-bold text-emerald-300">98.4% HIGH</p></div><div className="text-right"><p className="text-[9px] text-slate-500">Last model run</p><p className="mt-1 text-xs font-bold text-white">Just now</p></div></div></div></section>
+      <section className="space-y-4"><div className="rounded-2xl border border-violet-400/25 bg-gradient-to-br from-[#17143b] to-[#071733] p-5"><div className="flex items-center justify-between gap-2"><div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.18em] text-violet-200"><BrainCircuit className="h-4 w-4" /> Model interpretation</div><span className="rounded-md bg-violet-400/15 px-2 py-1 text-[9px] font-bold text-violet-200">EXPLAINABLE AI</span></div><h2 className="mt-4 text-xl font-black leading-tight text-white">{latest?.explanation?.headline || "Physiological Parameters Stable"}</h2><p className="mt-3 text-xs leading-relaxed text-slate-300">{latest?.explanation?.summary || "Model evaluation detected no multi-dimensional cluster divergence across cardiovascular or respiratory telemetry streams."}</p>{latest?.explanation?.changePointDetails && <div className="mt-4 border-l-2 border-violet-300/60 bg-white/[0.04] px-3 py-2 text-[11px] leading-relaxed text-violet-100"><span className="font-bold text-violet-300">Change-point detected: </span>{latest.explanation.changePointDetails}</div>}</div><div className="grid gap-2 sm:grid-cols-3"><Signal label="Cardiovascular" value={critical || warning ? "DIVERGENCE" : "NOMINAL"} icon={Activity} tone={critical || warning ? "rose" : "cyan"} /><Signal label="Oxygenation" value="MONITORED" icon={Waves} tone="cyan" /><Signal label="Recovery curve" value={watch || critical ? "REVIEW" : "STABLE"} icon={TrendingDown} tone={watch || critical ? "amber" : "green"} /></div><div className="rounded-2xl border border-cyan-400/20 bg-[#061735]/80 p-5"><div className="flex items-center justify-between"><div><h2 className="flex items-center gap-2 text-sm font-black text-white"><Sparkles className="h-4 w-4 text-cyan-300" /> Clinical recommendation</h2><p className="mt-1 text-[10px] text-slate-500">Generated from the current evidence window.</p></div><CheckCircle2 className="h-4 w-4 text-cyan-300" /></div><p className="mt-4 text-xs leading-relaxed text-slate-300">{critical || warning ? "Notify the Flight Surgeon, confirm secondary readings, and pause high-strain operations until the baseline stabilizes." : watch ? "Prioritize recovery, hydration and a follow-up telemetry review before the next high-strain operation." : "Continue routine monitoring. Current physiological signals remain within expected mission baseline."}</p><Link href={`/medical/astronauts/${astronautId}`} className="mt-4 inline-flex items-center gap-2 text-[10px] font-bold text-cyan-300 hover:text-white">Open Doctor Review <ArrowUpRight className="h-3.5 w-3.5" /></Link></div></section>
+      <aside className="space-y-4"><section className="rounded-2xl border border-cyan-400/20 bg-[#061735]/85 p-4"><div className="flex items-center justify-between"><h2 className="text-xs font-black uppercase tracking-wider text-cyan-100">Signal drivers</h2><TrendingUp className="h-4 w-4 text-cyan-300" /></div>{latest?.contributors?.length ? <div className="mt-4 space-y-3">{latest.contributors.slice(0, 5).map((contributor, index) => <div key={`${contributor.signal}-${index}`}><div className="flex items-center justify-between gap-2"><span className="truncate text-[10px] font-bold text-white">{contributor.signal}</span><span className={`rounded px-1.5 py-0.5 text-[8px] font-bold ${contributor.impact === "High" ? "bg-rose-500/20 text-rose-200" : "bg-cyan-500/15 text-cyan-200"}`}>{contributor.impact}</span></div><div className="mt-1.5 h-1 overflow-hidden rounded-full bg-white/10"><div className={`h-full rounded-full ${contributor.impact === "High" ? "w-5/6 bg-rose-400" : "w-2/5 bg-cyan-400"}`} /></div><p className="mt-1 text-[9px] text-slate-500">{contributor.change}</p></div>)}</div> : <p className="mt-4 text-[10px] text-slate-500">No contributor metadata available.</p>}</section><section className="rounded-2xl border border-amber-400/20 bg-amber-500/5 p-4"><div className="flex items-center gap-2 text-amber-200"><ShieldAlert className="h-4 w-4" /><h2 className="text-xs font-black">Decision gate</h2></div><p className="mt-3 text-[10px] leading-relaxed text-slate-400">AI output is clinical decision support. A Medical Officer must authorize any countermeasure or mission restriction.</p><div className="mt-4 flex items-center gap-2 text-[9px] font-bold text-amber-200"><CircleDot className="h-3 w-3" /> Awaiting physician review</div></section></aside></main>
+  </div></div>;
 }
+function Tab({ href, label, active = false }: { href: string; label: string; active?: boolean }) { return <Link href={href} className={`whitespace-nowrap rounded-lg px-3 py-2 font-bold ${active ? "bg-cyan-400 text-[#03142c]" : "text-slate-400 hover:text-white"}`}>{label}</Link>; }
+function Signal({ label, value, icon: Icon, tone }: { label: string; value: string; icon: typeof Activity; tone: "cyan" | "rose" | "amber" | "green" }) { const color = tone === "rose" ? "border-rose-400/25 bg-rose-500/10 text-rose-200" : tone === "amber" ? "border-amber-400/25 bg-amber-500/10 text-amber-200" : tone === "green" ? "border-emerald-400/25 bg-emerald-500/10 text-emerald-200" : "border-cyan-400/25 bg-cyan-500/10 text-cyan-200"; return <div className={`rounded-xl border p-3 ${color}`}><Icon className="h-4 w-4" /><p className="mt-3 text-[9px] text-slate-400">{label}</p><p className="mt-1 text-[10px] font-black text-white">{value}</p></div>; }

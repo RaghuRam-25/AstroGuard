@@ -5,9 +5,10 @@ import { Brain, Mic, Volume2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { AnalysisResponse, ChatMessage } from "@/lib/analysisChat";
 import { generateAnalysisReply, LATEST_SNAPSHOT, speechTextFor } from "@/lib/analysisChat";
-import { postAnalysisChat } from "@/lib/api";
+import { generateConsultationSummary, getAnalysisChatHistory, postAnalysisChat } from "@/lib/api";
 import { useSpeechPlayback } from "@/hooks/useSpeechPlayback";
 import { useVoiceRecorder } from "@/hooks/useVoiceRecorder";
+import { useAuth } from "@/context/AuthContext";
 import AnalysisMessage from "./AnalysisMessage";
 import ChatInputBar from "./ChatInputBar";
 
@@ -33,12 +34,13 @@ function buildSeedConversation(): ChatMessage[] {
   ];
 }
 
-async function resolveReply(text: string): Promise<AnalysisResponse> {
+async function resolveReply(text: string, astronautId: string, voice = false): Promise<AnalysisResponse> {
   try {
     const res = await postAnalysisChat({
-      astronautId: "AST-001",
+      astronautId: astronautId || "AST-001",
       question: text,
       latestData: LATEST_SNAPSHOT,
+      voice,
     });
     if (res.success && res.data) {
       const payload = res.data as { response?: AnalysisResponse };
@@ -52,6 +54,7 @@ async function resolveReply(text: string): Promise<AnalysisResponse> {
 }
 
 export default function AnalysisPanel() {
+  const { user } = useAuth();
   const [messages, setMessages] = useState<ChatMessage[]>(buildSeedConversation);
   const [input, setInput] = useState("");
   const [typing, setTyping] = useState(false);
@@ -60,11 +63,37 @@ export default function AnalysisPanel() {
   const recorder = useVoiceRecorder();
   const scrollRef = useRef<HTMLDivElement | null>(null);
   const busyRef = useRef(false);
+  const reportRequestedRef = useRef(false);
+
+  useEffect(() => {
+    let active = true;
+    void getAnalysisChatHistory().then((res) => {
+      if (!active || !res.success || !res.data) return;
+      const persisted = (res.data as { messages?: Array<ChatMessage & { _id?: string }> }).messages;
+      if (persisted?.length) setMessages(persisted.map((message) => ({ ...message, id: String(message._id || message.id || `history-${message.createdAt}`) })));
+    });
+    return () => { active = false; };
+  }, []);
 
   useEffect(() => {
     const el = scrollRef.current;
     if (el) el.scrollTop = el.scrollHeight;
   }, [messages, typing]);
+
+  useEffect(() => {
+    if (messages.length <= 2) return;
+    const requestHandover = () => {
+      if (reportRequestedRef.current) return;
+      reportRequestedRef.current = true;
+      void generateConsultationSummary();
+    };
+    const idleTimer = window.setTimeout(requestHandover, 120000);
+    window.addEventListener("pagehide", requestHandover);
+    return () => {
+      window.clearTimeout(idleTimer);
+      window.removeEventListener("pagehide", requestHandover);
+    };
+  }, [messages.length]);
 
   const pushAssistant = (
     text: string,
@@ -86,6 +115,7 @@ export default function AnalysisPanel() {
     if (!text || busyRef.current) return;
 
     busyRef.current = true;
+    reportRequestedRef.current = false;
     const userMessage: ChatMessage = {
       id: `ask-${Date.now().toString(36)}`,
       role: "user",
@@ -97,7 +127,7 @@ export default function AnalysisPanel() {
     setInput("");
     setTyping(true);
 
-    const reply = await resolveReply(text);
+    const reply = await resolveReply(text, user?.astronautId || "AST-001", voice);
     const assistantMessage = pushAssistant("Based on your latest telemetry, here is what I found.", reply, voice);
 
     setMessages((prev) => [...prev, assistantMessage]);

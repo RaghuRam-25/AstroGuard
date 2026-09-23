@@ -9,7 +9,7 @@ export class HealthController {
    */
   public static async postHealthData(req: Request, res: Response, next: NextFunction) {
     try {
-      let { astronautId, heartRate, spo2, sleep, activity, notes, source, timestamp } = req.body;
+      let { astronautId, heartRate, spo2, sleep, activity, ecg, bloodPressure, coreTemperatureC, respirationRate, microgravityStressIndex, notes, source, timestamp } = req.body;
 
       // Never trust client-supplied astronautId for astronaut role
       if (req.user && req.user.role === "astronaut") {
@@ -30,6 +30,11 @@ export class HealthController {
         spo2,
         sleep,
         activity,
+        ecg,
+        bloodPressure,
+        coreTemperatureC,
+        respirationRate,
+        microgravityStressIndex,
         notes,
         source,
         timestamp,

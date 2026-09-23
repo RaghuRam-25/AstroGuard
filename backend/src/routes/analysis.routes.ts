@@ -6,31 +6,34 @@ import {
   getAstronautAnalysisSchema,
 } from "../validators/analysis.validator.js";
 import { authenticate } from "../middleware/auth.middleware.js";
-import { checkAstronautAccess } from "../middleware/ownership.middleware.js";
+import { checkMedicalDataAccess } from "../middleware/medicalPrivacy.middleware.js";
 
 const router = Router();
 
 // Protect all analysis routes
 router.use(authenticate);
 
+router.post("/chat", AnalysisController.chat);
+router.get("/chat/history", AnalysisController.getChatHistory);
+
 router.post(
   "/",
   validateRequest(triggerAnalysisSchema),
-  checkAstronautAccess("astronautId"),
+  checkMedicalDataAccess("astronautId"),
   AnalysisController.triggerAnalysis
 );
 
 router.get(
   "/:astronautId/latest",
   validateRequest(getAstronautAnalysisSchema),
-  checkAstronautAccess("astronautId"),
+  checkMedicalDataAccess("astronautId"),
   AnalysisController.getLatestAnalysis
 );
 
 router.get(
   "/:astronautId/history",
   validateRequest(getAstronautAnalysisSchema),
-  checkAstronautAccess("astronautId"),
+  checkMedicalDataAccess("astronautId"),
   AnalysisController.getAnalysisHistory
 );
 

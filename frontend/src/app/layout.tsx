@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Analytics } from "@vercel/analytics/react";
 import { SpeedInsights } from "@vercel/speed-insights/next";
 import { AuthProvider } from "../context/AuthContext";
+import { RegistrationProvider } from "../context/RegistrationContext";
 import AppLayout from "./components/AppLayout";
 import "./index.css";
 
@@ -20,7 +21,9 @@ export default function RootLayout({
     <html lang="en" className="h-full antialiased">
       <body className="min-h-full bg-[#020817] text-white">
         <AuthProvider>
-          <AppLayout>{children}</AppLayout>
+          <RegistrationProvider>
+            <AppLayout>{children}</AppLayout>
+          </RegistrationProvider>
         </AuthProvider>
         <Analytics />
         <SpeedInsights />

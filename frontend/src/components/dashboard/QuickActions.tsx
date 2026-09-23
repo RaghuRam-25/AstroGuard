@@ -1,12 +1,12 @@
 import Link from "next/link";
-import { Zap, FilePlus2, Brain, Bell, History } from "lucide-react";
+import { Zap, ScanLine, Brain, History } from "lucide-react";
 import { Card } from "@/components/shared/Card";
 
 const ACTIONS = [
-  { label: "Enter Health Data", href: "/astronaut/data-input", icon: FilePlus2 },
+  { label: "Scan RFID Meal Pack", href: "/astronaut/dashboard", icon: ScanLine },
   { label: "View AI Analysis", href: "/astronaut/ai-analysis", icon: Brain },
-  { label: "View Alerts", href: "/astronaut/alerts", icon: Bell },
   { label: "View Health History", href: "/astronaut/health", icon: History },
+  { label: "Enter Health Data", href: "/astronaut/data-input", icon: History },
 ];
 
 export default function QuickActions() {

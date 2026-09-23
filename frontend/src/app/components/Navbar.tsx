@@ -15,7 +15,7 @@ const Navbar = () => {
     { href: "/health", label: "Health Trends" },
     { href: "/ai-analysis", label: "AI Analysis" },
     { href: "/alerts", label: "Alerts" },
-    { href: "/input", label: "Simulator / Input" },
+    { href: "/input", label: "Live Telemetry & Scanner" },
   ];
 
   return (

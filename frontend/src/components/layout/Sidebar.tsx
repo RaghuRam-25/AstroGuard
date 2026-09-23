@@ -3,12 +3,15 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
+  LayoutDashboard,
   Activity,
-  FilePlus2,
+  Radio,
   Brain,
-  Bell,
   User,
+  FlaskConical,
+  Microscope,
   Satellite,
+  MessageCircle,
   X,
   LogOut,
 } from "lucide-react";
@@ -17,10 +20,10 @@ import { astronaut, missionInfo } from "@/data/mockData";
 import { useAuth } from "@/context/AuthContext";
 
 const navItems = [
-  { href: "/astronaut/health", label: "My Health", icon: Activity },
-  { href: "/astronaut/data-input", label: "Data Input", icon: FilePlus2 },
+  { href: "/astronaut/dashboard", label: "Health Dashboard", icon: LayoutDashboard },
+  { href: "/astronaut/data-input", label: "Telemetry & RFID", icon: Radio },
   { href: "/astronaut/ai-analysis", label: "AI Analysis", icon: Brain },
-  { href: "/astronaut/alerts", label: "My Alerts", icon: Bell },
+  { href: "/astronaut/medical-consult", label: "Chat & Call", icon: MessageCircle },
   { href: "/astronaut/profile", label: "Profile", icon: User },
 ];
 
@@ -81,10 +84,20 @@ interface SidebarProps {
 
 export default function Sidebar({ open, onClose }: SidebarProps) {
   const pathname = usePathname();
-  const { logout } = useAuth();
+  const { user, logout } = useAuth();
 
   const isActive = (href: string) =>
     pathname === href || pathname.startsWith(href + "/");
+
+  const initials = user?.name
+    ? user.name
+        .split(" ")
+        .filter((w) => w.length > 0)
+        .map((n) => n[0])
+        .join("")
+        .slice(0, 2)
+        .toUpperCase()
+    : "AM";
 
   return (
     <>
@@ -102,28 +115,18 @@ export default function Sidebar({ open, onClose }: SidebarProps) {
           "fixed inset-y-0 left-0 z-50 flex w-[250px] shrink-0 flex-col border-r border-sky-400/10 transition-transform duration-300 ease-in-out lg:translate-x-0",
           open ? "translate-x-0" : "-translate-x-full"
         )}
-style={{
+        style={{
           backgroundImage:
-            "linear-gradient(to bottom, rgba(2, 8, 23, 0.9), rgba(4, 16, 31, 0.82)), url('/sidebarbg.png')",
+            "linear-gradient(to bottom, rgba(2, 8, 23, 0.95), rgba(4, 16, 31, 0.9)), url('/sidebarbg.png')",
           backgroundSize: "cover",
           backgroundPosition: "center",
         }}
         aria-label="Main navigation"
       >
-        {/* Close button (mobile) */}
-        <button
-          type="button"
-          onClick={onClose}
-          aria-label="Close navigation menu"
-          className="absolute right-3 top-3 rounded-lg border border-white/10 bg-white/5 p-1.5 text-slate-400 hover:text-white lg:hidden"
-        >
-          <X className="h-4 w-4" />
-        </button>
-
-        <div className="flex flex-col gap-8 px-5 pt-6">
-          {/* Logo */}
+        {/* Header: Logo & Mobile Close */}
+        <div className="flex items-center justify-between px-5 pt-5 pb-3 shrink-0">
           <Link
-            href="/astronaut/health"
+            href="/astronaut/dashboard"
             className="flex items-center gap-3"
             aria-label="AstroGuard home"
           >
@@ -133,12 +136,23 @@ style={{
                 Astro<span className="text-primary">Guard</span>
               </span>
               <span className="text-[10px] font-medium uppercase tracking-[0.18em] text-slate-400">
-                Astronaut Health Intelligence
+                Astronaut Health
               </span>
             </span>
           </Link>
 
-          {/* Navigation */}
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label="Close navigation menu"
+            className="rounded-lg border border-white/10 bg-white/5 p-1.5 text-slate-400 hover:text-white lg:hidden"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+
+        {/* Scrollable Navigation Area */}
+        <div className="flex-1 min-h-0 overflow-y-auto px-4 py-2 space-y-4 [scrollbar-width:thin] [scrollbar-color:rgba(56,189,248,0.2)_transparent]">
           <nav className="flex flex-col gap-1">
             {navItems.map((item) => {
               const Icon = item.icon;
@@ -150,68 +164,65 @@ style={{
                   onClick={onClose}
                   aria-current={active ? "page" : undefined}
                   className={cn(
-                    "group relative flex items-center gap-3 rounded-lg px-3.5 py-2.5 text-sm font-medium transition-all duration-200",
+                    "group relative flex items-center gap-3 rounded-xl px-3 py-2 text-sm font-medium transition-all duration-200",
                     active
-                      ? "bg-sky-500/15 text-sky-300 shadow-[0_0_20px_rgba(56,189,248,0.12)]"
+                      ? "bg-sky-500/15 text-sky-300 shadow-[0_0_20px_rgba(56,189,248,0.12)] border border-sky-400/20"
                       : "text-slate-300 hover:bg-white/[0.06] hover:text-white"
                   )}
                 >
                   {active && (
-                    <span className="absolute left-0 top-1/2 h-5 w-0.5 -translate-y-1/2 rounded-full bg-primary shadow-[0_0_8px_rgba(56,189,248,0.9)]" />
+                    <span className="absolute left-0 top-1/2 h-5 w-1 -translate-y-1/2 rounded-full bg-primary shadow-[0_0_8px_rgba(56,189,248,0.9)]" />
                   )}
                   <Icon
                     className={cn(
-                      "h-4 w-4 transition-colors",
-                      active ? "text-primary" : "text-slate-500 group-hover:text-slate-300"
+                      "h-4 w-4 shrink-0 transition-colors",
+                      active ? "text-primary" : "text-slate-400 group-hover:text-slate-200"
                     )}
                   />
-                  {item.label}
+                  <span className="truncate">{item.label}</span>
                 </Link>
               );
             })}
           </nav>
-        </div>
 
-        {/* Mission status footer */}
-        <div className="mt-auto px-5 pb-6">
-          <div className="rounded-xl border border-sky-400/10 bg-card-secondary/50 p-4">
+          {/* Mission status card */}
+          <div className="rounded-xl border border-sky-400/15 bg-card-secondary/40 p-3.5 backdrop-blur-sm">
             <p className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-[0.16em] text-slate-400">
               <Satellite className="h-3 w-3 text-primary" />
               Mission Status
             </p>
-            <p className="mt-2.5 text-sm font-semibold text-white">
+            <p className="mt-1.5 text-xs font-semibold text-white">
               {missionInfo.mission}
             </p>
-            <p className="mt-1 text-xs text-slate-400">
-              Mission Day {missionInfo.missionDay}
-            </p>
-            <div className="mt-3 flex items-center gap-2">
-              <span className="relative flex h-2 w-2">
-                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-success opacity-60" />
-                <span className="relative inline-flex h-2 w-2 rounded-full bg-success" />
-              </span>
-              <span className="text-[11px] font-semibold tracking-wide text-success">
-                Status: ACTIVE
+            <div className="mt-2 flex items-center justify-between text-[11px] text-slate-400">
+              <span>Day {missionInfo.missionDay}</span>
+              <span className="flex items-center gap-1.5 font-semibold text-success">
+                <span className="relative flex h-1.5 w-1.5">
+                  <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-success opacity-60" />
+                  <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-success" />
+                </span>
+                ACTIVE
               </span>
             </div>
           </div>
+        </div>
 
-          {/* Astronaut profile */}
-          <div className="mt-3 flex items-center gap-3 rounded-xl border border-sky-400/10 bg-card-secondary/50 p-3">
+        {/* Fixed Bottom: Astronaut Profile & Logout Button (ALWAYS VISIBLE) */}
+        <div className="shrink-0 border-t border-sky-400/15 bg-[#020817]/95 px-4 py-3.5 backdrop-blur-md">
+          <div className="flex items-center gap-3 rounded-xl border border-sky-400/15 bg-slate-900/60 p-2.5">
             <div className="relative shrink-0">
-              <div className="flex h-10 w-10 items-center justify-center rounded-full border border-sky-400/30 bg-gradient-to-br from-sky-500/25 to-cyan-400/10 text-xs font-bold text-sky-300">
-                AM
+              <div className="flex h-9 w-9 items-center justify-center rounded-full border border-sky-400/30 bg-gradient-to-br from-sky-500/25 to-cyan-400/10 text-xs font-bold text-sky-300">
+                {initials}
               </div>
-              <span className="absolute -bottom-0 -right-0 h-3 w-3 rounded-full border-2 border-[#061426] bg-success" />
+              <span className="absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full border-2 border-[#061426] bg-success" />
             </div>
-            <div className="min-w-0">
-              <p className="truncate text-sm font-semibold text-white">
-                {astronaut.name}
+            <div className="min-w-0 flex-1">
+              <p className="truncate text-xs font-semibold text-white">
+                {user?.name || astronaut.name}
               </p>
-              <p className="text-[11px] font-medium text-sky-400/90">
-                {astronaut.id}
+              <p className="text-[10px] font-medium text-sky-400">
+                {user?.astronautId || astronaut.id} • Astronaut
               </p>
-              <p className="text-[10px] text-slate-400">{astronaut.mission}</p>
             </div>
           </div>
 
@@ -221,10 +232,11 @@ style={{
               void logout();
               onClose();
             }}
-            className="mt-3 flex w-full items-center justify-center gap-2 rounded-lg border border-red-400/25 bg-red-500/10 px-3 py-2 text-xs font-semibold text-red-300 transition-all hover:border-red-400/50 hover:bg-red-500/20 hover:text-red-200"
+            className="mt-2.5 flex w-full items-center justify-center gap-2 rounded-xl border border-rose-500/30 bg-rose-500/15 px-3 py-2.5 text-xs font-bold text-rose-200 transition-all duration-200 hover:border-rose-400/60 hover:bg-rose-500/25 hover:text-white shadow-[0_0_15px_rgba(244,63,94,0.15)] active:scale-[0.98]"
+            title="Log out of session"
           >
-            <LogOut className="h-3.5 w-3.5" />
-            Sign Out
+            <LogOut className="h-4 w-4 text-rose-400" />
+            <span>Logout Session</span>
           </button>
         </div>
       </aside>

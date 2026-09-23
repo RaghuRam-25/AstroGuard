@@ -8,12 +8,12 @@ import LoginForm from "../../components/auth/LoginForm";
 import { useAuth } from "../../context/AuthContext";
 import { LoadingState } from "../../components/shared/LoadingState";
 import { Shield } from "lucide-react";
+import RootBackground from "../../components/public/RootBackground";
 
 const ROLE_REDIRECTS: Record<string, string> = {
   astronaut: "/astronaut/health",
   medical_officer: "/medical/dashboard",
   mission_control: "/mission-control/dashboard",
-  admin: "/admin/dashboard",
 };
 
 export default function LoginPage() {
@@ -31,10 +31,9 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen bg-[#020817] flex flex-col justify-center py-12 px-4 sm:px-6 lg:px-8 relative overflow-hidden">
-      {/* Background Neon Space Glows */}
-      <div className="absolute top-1/4 left-1/2 -translate-x-1/2 w-[600px] h-[600px] bg-blue-600/10 rounded-full blur-3xl pointer-events-none" />
-      <div className="absolute bottom-10 right-10 w-[300px] h-[300px] bg-emerald-600/5 rounded-full blur-2xl pointer-events-none" />
+    <div className="relative min-h-screen overflow-hidden bg-background text-foreground flex flex-col justify-center py-12 px-4 sm:px-6 lg:px-8">
+      {/* Shared public astronomy background (matches register page) */}
+      <RootBackground />
 
       <div className="sm:mx-auto sm:w-full sm:max-w-md relative z-10 text-center space-y-3">
         <Link href="/" className="inline-flex items-center gap-3">
@@ -50,9 +49,6 @@ export default function LoginPage() {
           <h2 className="text-xl sm:text-2xl font-bold tracking-tight text-white">
             Mission Health Gateway
           </h2>
-          <p className="text-xs sm:text-sm text-slate-400 mt-1">
-            Secure biometric & telemetry cryptographic authorization.
-          </p>
         </div>
       </div>
 
@@ -64,22 +60,7 @@ export default function LoginPage() {
               Clearance Level Authentication
             </span>
           </div>
-
           <LoginForm />
-
-          <div className="border-t border-white/5 pt-5 text-center">
-            <p className="text-xs text-slate-400">New astronaut applicant?</p>
-            <Link
-              href="/register"
-              className="mt-3 inline-flex w-full items-center justify-center rounded-xl border border-blue-400/30 bg-blue-500/10 px-4 py-3 text-sm font-semibold text-blue-100 transition hover:border-blue-300/60 hover:bg-blue-500/20"
-            >
-              Create Astronaut Account
-            </Link>
-          </div>
-        </div>
-
-        <div className="mt-6 text-center text-xs text-slate-500">
-          <span>AstroGuard Autonomous Biosensor Protocol • Ares Mission 01</span>
         </div>
       </div>
     </div>

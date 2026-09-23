@@ -19,6 +19,11 @@ export const createHealthDataSchema = z.object({
       .number()
       .min(0, "Activity level must be between 0% and 100%")
       .max(100, "Activity level must be between 0% and 100%"),
+    ecg: z.object({ rhythm: z.string().max(40).optional(), arrhythmiaDetected: z.coerce.boolean().optional(), qtIntervalMs: z.coerce.number().min(0).max(1000).optional() }).optional(),
+    bloodPressure: z.object({ systolic: z.coerce.number().min(50).max(260).optional(), diastolic: z.coerce.number().min(20).max(180).optional() }).optional(),
+    coreTemperatureC: z.coerce.number().min(30).max(45).optional(),
+    respirationRate: z.coerce.number().min(0).max(80).optional(),
+    microgravityStressIndex: z.coerce.number().min(0).max(100).optional(),
     notes: z.string().trim().optional(),
     timestamp: z.coerce.date().optional(),
     source: z.enum(["manual", "sensor", "csv"]).default("manual").optional(),

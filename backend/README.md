@@ -121,7 +121,13 @@ MONGODB_URI=mongodb://localhost:27017/astroguard
 ML_SERVICE_URL=http://localhost:8000
 FRONTEND_URL=http://localhost:3000
 NODE_ENV=development
+# Optional OpenAI-compatible ASTRO-AI provider. If omitted, the contextual safety fallback is used.
+AI_API_BASE_URL=https://api.openai.com/v1
+AI_API_KEY=your_provider_key
+AI_MODEL=gpt-5-mini
 ```
+
+The `/api/analysis/chat` endpoint injects the authenticated astronaut's latest telemetry, calculated personal and mission baselines, latest bio-sample results, unresolved alerts, and latest anomaly analysis into the private ASTRO-AI prompt. Each user and assistant turn is persisted in MongoDB through the `ChatMessage` model and can be retrieved from `/api/analysis/chat/history`.
 
 ---
 

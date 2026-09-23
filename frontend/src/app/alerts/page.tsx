@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { Heart, Moon, Droplet, Activity, ShieldCheck, LucideIcon } from "lucide-react";
 import ProtectedRoute from "../../components/auth/ProtectedRoute";
+import RoleGuard from "../../components/auth/RoleGuard";
 
 interface AlertItem {
   id: number;
@@ -88,6 +89,7 @@ export default function AlertsPage() {
 
   return (
     <ProtectedRoute>
+      <RoleGuard allowedRoles={["medical_officer", "mission_control"]}>
       <div className="p-4 sm:p-6 lg:p-8 space-y-6">
       
       {/* Header & Filter Pills */}
@@ -164,6 +166,7 @@ export default function AlertsPage() {
       </div>
 
     </div>
+    </RoleGuard>
     </ProtectedRoute>
   );
 }

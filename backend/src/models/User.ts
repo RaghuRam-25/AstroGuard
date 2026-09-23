@@ -1,7 +1,7 @@
 import mongoose, { Document, Schema } from "mongoose";
 import bcrypt from "bcryptjs";
 
-export type UserRole = "astronaut" | "medical_officer" | "mission_control" | "admin";
+export type UserRole = "astronaut" | "medical_officer" | "mission_control";
 
 export interface IUser extends Document {
   name: string;
@@ -10,6 +10,7 @@ export interface IUser extends Document {
   passwordHash: string;
   role: UserRole;
   astronautId?: string;
+  nasaBadgeId?: string;
   phone?: string;
   dateOfBirth?: Date;
   country?: string;
@@ -56,7 +57,7 @@ const UserSchema: Schema = new Schema(
     },
     role: {
       type: String,
-      enum: ["astronaut", "medical_officer", "mission_control", "admin"],
+      enum: ["astronaut", "medical_officer", "mission_control"],
       default: "astronaut",
       index: true,
     },
@@ -65,6 +66,7 @@ const UserSchema: Schema = new Schema(
       trim: true,
       index: true,
     },
+    nasaBadgeId: { type: String, trim: true, uppercase: true, unique: true, sparse: true, index: true },
     phone: {
       type: String,
       trim: true,

@@ -14,7 +14,6 @@ import {
   Search,
   Menu,
   X,
-  Shield,
   LogOut,
   LogIn,
   Info,
@@ -35,11 +34,13 @@ export default function AppLayout({ children }: AppLayoutProps) {
     pathname === "/login" ||
     pathname === "/register" ||
     pathname === "/about" ||
+    pathname === "/mission" ||
+    pathname === "/contact" ||
+    pathname === "/sensors" ||
     pathname === "/unauthorized" ||
     pathname.startsWith("/astronaut") ||
     pathname.startsWith("/medical") ||
-    pathname.startsWith("/mission-control") ||
-    pathname.startsWith("/admin");
+    pathname.startsWith("/mission-control");
 
   // If on public pages or role-specific routes, bypass generic layout
   if (isBypassLayout) {
@@ -49,20 +50,23 @@ export default function AppLayout({ children }: AppLayoutProps) {
   const baseNavItems = [
     { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
     { href: "/health", label: "Health", icon: Activity },
-    { href: "/input", label: "Data Input", icon: FileSpreadsheet },
+    { href: "/input", label: "Live Telemetry & Scanner", icon: Activity },
     { href: "/ai-analysis", label: "AI Analysis", icon: Brain },
-    { href: "/alerts", label: "Alerts", icon: Bell },
   ];
 
-  // Admin link only visible to admin role
-  const navItems = user?.role === "admin"
-    ? [...baseNavItems, { href: "/admin", label: "Admin Security", icon: Shield }]
-    : baseNavItems;
+  // Alerts are restricted to Flight Surgeons and Mission Controllers.
+  const canViewAlerts =
+    user?.role === "medical_officer" ||
+    user?.role === "mission_control";
+
+  // Navigation is role-scoped per module
+  const navItems = [
+    ...baseNavItems,
+    ...(canViewAlerts ? [{ href: "/alerts", label: "Alerts", icon: Bell }] : []),
+  ];
 
   const formatRoleLabel = (role?: string) => {
     switch (role) {
-      case "admin":
-        return "Mission Administrator";
       case "medical_officer":
         return "Flight Surgeon";
       case "mission_control":

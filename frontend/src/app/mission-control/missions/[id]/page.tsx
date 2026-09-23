@@ -11,14 +11,8 @@ interface MissionCrewMember {
   astronautId: string;
   name: string;
   role: string;
-  latestHealth?: {
-    heartRate?: number;
-    spo2?: number;
-    activity?: number;
-  };
-  latestAnalysis?: {
-    riskLevel?: string;
-  };
+  readinessBadge?: "GREEN" | "YELLOW" | "RED";
+  readinessLabel?: string;
 }
 
 interface MissionAlert {
@@ -122,9 +116,9 @@ export default function MissionControlMissionDetailPage() {
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {crew.map((member) => {
-            const risk = member.latestAnalysis?.riskLevel || "Low";
-            const isHighRisk = risk === "Critical" || risk === "Warning";
-            const isWatch = risk === "Watch";
+            const readiness = member.readinessBadge || "GREEN";
+            const isHighRisk = readiness === "RED";
+            const isWatch = readiness === "YELLOW";
 
             return (
               <div
@@ -150,24 +144,11 @@ export default function MissionControlMissionDetailPage() {
                         : "bg-emerald-500/15 text-emerald-300 border-emerald-500/30"
                     }`}
                   >
-                    {risk}
+                    {readiness}
                   </span>
                 </div>
 
-                <div className="grid grid-cols-3 gap-2 py-2 px-3 rounded-xl bg-black/30 text-center font-mono text-xs">
-                  <div>
-                    <span className="text-[10px] text-slate-500 block">HR</span>
-                    <span className="text-white font-bold">{member.latestHealth?.heartRate ?? 72} BPM</span>
-                  </div>
-                  <div>
-                    <span className="text-[10px] text-slate-500 block">SpO₂</span>
-                    <span className="text-cyan-300 font-bold">{member.latestHealth?.spo2 ?? 98}%</span>
-                  </div>
-                  <div>
-                    <span className="text-[10px] text-slate-500 block">Activity</span>
-                    <span className="text-emerald-300 font-bold">{member.latestHealth?.activity ?? 65}%</span>
-                  </div>
-                </div>
+                <div className="grid grid-cols-1 gap-2 py-2 px-3 rounded-xl bg-black/30 text-center font-mono text-xs"><span className={isHighRisk ? "text-red-300" : isWatch ? "text-amber-300" : "text-emerald-300"}>{member.readinessLabel || "Fit for Mission Duty"}</span></div>
               </div>
             );
           })}

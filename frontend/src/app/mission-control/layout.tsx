@@ -10,19 +10,19 @@ import RoleGuard from "../../components/auth/RoleGuard";
 import {
   LayoutDashboard,
   Rocket,
-  BarChart3,
-  Bell,
   LogOut,
   Menu,
   X,
   Radio,
+  Users,
+  ShieldAlert,
 } from "lucide-react";
 
 const navItems = [
   { href: "/mission-control/dashboard", label: "Mission Dashboard", icon: LayoutDashboard },
   { href: "/mission-control/missions", label: "Missions", icon: Rocket },
-  { href: "/mission-control/alerts", label: "Alerts", icon: Bell },
-  { href: "/mission-control/analytics", label: "Analytics", icon: BarChart3 },
+  { href: "/mission-control/crew-directory", label: "Crew Directory", icon: Users },
+  { href: "/mission-control/governance", label: "System Governance", icon: ShieldAlert },
 ];
 
 export default function MissionControlLayout({ children }: { children: React.ReactNode }) {

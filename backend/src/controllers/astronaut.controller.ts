@@ -1,6 +1,7 @@
 import { Request, Response, NextFunction } from "express";
 import { Astronaut } from "../models/Astronaut.js";
 import { successResponse, errorResponse } from "../utils/response.js";
+import { MedicalAssignment } from "../models/MedicalAssignment.js";
 
 export class AstronautController {
   /**
@@ -15,8 +16,9 @@ export class AstronautController {
       if (user) {
         if (user.role === "astronaut") {
           query.astronautId = user.astronautId;
-        } else if (user.role === "medical_officer" && user.assignedAstronautIds && user.assignedAstronautIds.length > 0) {
-          query.astronautId = { $in: user.assignedAstronautIds };
+        } else if (user.role === "medical_officer") {
+          const assignments = await MedicalAssignment.find({ $or: [{ medicalOfficerId: user._id.toString() }, { medicalOfficerId: user.email }] }).select("astronautIds").lean();
+          query.astronautId = { $in: [...new Set(assignments.flatMap((assignment) => assignment.astronautIds))] };
         } else if (user.role === "mission_control" && user.missionIds && user.missionIds.length > 0) {
           query.mission = { $in: user.missionIds };
         }
@@ -52,7 +54,7 @@ export class AstronautController {
 
   /**
    * POST /api/astronauts
-   * Create a new astronaut profile (Admin only)
+   * Create a new astronaut profile (Mission Control only)
    */
   public static async createAstronaut(req: Request, res: Response, next: NextFunction) {
     try {
@@ -70,7 +72,7 @@ export class AstronautController {
 
   /**
    * PUT /api/astronauts/:id
-   * Update an astronaut profile (Admin & Medical Officer)
+   * Update an astronaut profile (Mission Control & Medical Officer)
    */
   public static async updateAstronaut(req: Request, res: Response, next: NextFunction) {
     try {
@@ -93,7 +95,7 @@ export class AstronautController {
 
   /**
    * DELETE /api/astronauts/:id
-   * Remove an astronaut profile (Admin only)
+   * Remove an astronaut profile (Mission Control only)
    */
   public static async deleteAstronaut(req: Request, res: Response, next: NextFunction) {
     try {

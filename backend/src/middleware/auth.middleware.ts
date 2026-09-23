@@ -58,3 +58,32 @@ export const authenticate = async (
     next(error);
   }
 };
+
+export const optionalAuthenticate = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+) => {
+  try {
+    let token = req.cookies?.astro_token;
+    if (!token && req.headers.authorization?.startsWith("Bearer ")) {
+      token = req.headers.authorization.split(" ")[1];
+    }
+    if (token) {
+      try {
+        const decoded = verifyAccessToken(token);
+        const user = await User.findById(decoded.id);
+        if (user && user.isActive) {
+          req.user = user;
+          req.tokenPayload = decoded;
+        }
+      } catch {
+        // Continue unauthenticated
+      }
+    }
+    next();
+  } catch {
+    next();
+  }
+};
+

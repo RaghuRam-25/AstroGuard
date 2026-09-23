@@ -1,0 +1,13 @@
+import { Router } from "express";
+import { authenticate } from "../middleware/auth.middleware.js";
+import { requireRole } from "../middleware/role.middleware.js";
+import { ClinicalOperationsController } from "../controllers/clinicalOperations.controller.js";
+const router = Router();
+router.use(authenticate, requireRole("astronaut", "medical_officer"));
+router.get("/orders", ClinicalOperationsController.listOrders);
+router.post("/orders", requireRole("medical_officer"), ClinicalOperationsController.createOrder);
+router.patch("/orders/:id", ClinicalOperationsController.updateOrder);
+router.get("/countermeasures", ClinicalOperationsController.listCountermeasures);
+router.post("/countermeasures", requireRole("medical_officer"), ClinicalOperationsController.createCountermeasure);
+router.patch("/countermeasures/:id", ClinicalOperationsController.updateCountermeasure);
+export default router;

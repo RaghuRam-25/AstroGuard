@@ -10,6 +10,8 @@ import {
   clearAuthCookies,
 } from "../utils/token.js";
 import { successResponse, errorResponse } from "../utils/response.js";
+import { UploadService } from "../services/upload.service.js";
+import { RegistrationController } from "./registration.controller.js";
 
 const formatUserResponse = (user: IUser) => ({
   id: user._id.toString(),
@@ -18,6 +20,7 @@ const formatUserResponse = (user: IUser) => ({
   username: user.username,
   role: user.role,
   astronautId: user.astronautId,
+  nasaBadgeId: user.nasaBadgeId,
   phone: user.phone,
   dateOfBirth: user.dateOfBirth,
   country: user.country,
@@ -36,6 +39,10 @@ export class AuthController {
    */
   public static async register(req: Request, res: Response, next: NextFunction) {
     try {
+      if (!(await RegistrationController.isRegistrationOpen())) {
+        return errorResponse(res, "Public registration is currently closed. Please wait for Mission Control to open a registration window.", 403);
+      }
+
       const {
         name,
         email,
@@ -43,6 +50,7 @@ export class AuthController {
         password,
         role = "astronaut",
         astronautId,
+        nasaBadgeId,
         phone,
         dateOfBirth,
         country,
@@ -70,6 +78,18 @@ export class AuthController {
           ? astronautId || `AST-${Math.floor(100 + Math.random() * 900)}`
           : astronautId || undefined;
 
+      let finalProfileImage = profileImage || undefined;
+      if (profileImage && typeof profileImage === "string" && (profileImage.startsWith("data:") || profileImage.startsWith("http"))) {
+        try {
+          const uploadRes = await UploadService.uploadImage(profileImage, "astroguard/profiles");
+          if (uploadRes?.url) {
+            finalProfileImage = uploadRes.url;
+          }
+        } catch (uploadErr: any) {
+          console.warn("Could not upload profile image to Cloudinary, keeping fallback:", uploadErr.message);
+        }
+      }
+
       // Create new user with selected role
       const user = await User.create({
         name,
@@ -78,11 +98,12 @@ export class AuthController {
         passwordHash,
         role,
         astronautId: finalAstronautId,
+        nasaBadgeId: nasaBadgeId || (role === "astronaut" ? finalAstronautId : undefined),
         phone,
         dateOfBirth: new Date(dateOfBirth),
         country,
         gender: gender || undefined,
-        profileImage: profileImage || undefined,
+        profileImage: finalProfileImage,
         isActive: true,
       });
 
@@ -95,8 +116,9 @@ export class AuthController {
             role: "Astronaut",
             mission: "Ares Mission 01",
             missionDay: 142,
-            missionPhase: "Surface Operations",
+            missionPhase: "Transit",
             status: "Active",
+            avatar: finalProfileImage || "AM",
           },
           { upsert: true, new: true }
         );
@@ -134,6 +156,7 @@ export class AuthController {
           { email: normalizedIdentifier },
           { username: normalizedIdentifier },
           { astronautId: identifier },
+          { nasaBadgeId: identifier.toUpperCase() },
         ],
       }).select("+passwordHash");
       if (!user) {

@@ -8,6 +8,7 @@ import { Analysis } from "../models/Analysis.js";
 import { Alert } from "../models/Alert.js";
 import { Mission } from "../models/Mission.js";
 import { AuditLog } from "../models/AuditLog.js";
+import { MedicalAssignment } from "../models/MedicalAssignment.js";
 
 const seedDatabase = async () => {
   try {
@@ -23,6 +24,7 @@ const seedDatabase = async () => {
     await Alert.deleteMany({});
     await Mission.deleteMany({});
     await AuditLog.deleteMany({});
+    await MedicalAssignment.deleteMany({});
 
     // 2. Create Demo Users with Hashed Passwords
     console.log("👥 Creating demo role-based users...");
@@ -30,22 +32,13 @@ const seedDatabase = async () => {
     const defaultPasswordHash = await bcrypt.hash("AstroGuard@2025!", salt);
 
     const users = await User.insertMany([
-      // ─── Admin ───────────────────────────
-      {
-        name: "Mission Administrator",
-        email: "admin@astroguard.local",
-        passwordHash: defaultPasswordHash,
-        role: "admin",
-        missionIds: ["Ares Mission 01", "Artemis Lunar Base"],
-        isActive: true,
-      },
       // ─── Medical Officers ─────────────────
       {
         name: "Dr. Evelyn Vance",
         email: "medical@astroguard.local",
         passwordHash: defaultPasswordHash,
         role: "medical_officer",
-        assignedAstronautIds: ["AST-001", "AST-002", "AST-003", "AST-004"],
+        assignedAstronautIds: ["AST-001", "AST-002"],
         missionIds: ["Ares Mission 01"],
         isActive: true,
       },
@@ -130,6 +123,10 @@ const seedDatabase = async () => {
       description: "First crewed Ares mission — deep space transit and Martian orbit insertion",
     });
     console.log(`✅ Created mission: ${mission.name}`);
+    await MedicalAssignment.insertMany([
+      { missionId: mission.name, medicalOfficerId: users[0]._id.toString(), astronautIds: ["AST-001", "AST-002"], updatedBy: users[2]._id.toString() },
+      { missionId: mission.name, medicalOfficerId: users[1]._id.toString(), astronautIds: ["AST-003", "AST-004"], updatedBy: users[2]._id.toString() },
+    ]);
 
     // 4. Create Astronaut Profiles
     console.log("🧑‍🚀 Creating astronaut profiles...");
@@ -434,15 +431,15 @@ const seedDatabase = async () => {
 
     // 8. Seed AuditLog entries
     console.log("📋 Seeding audit log entries...");
-    const adminUserId = users[0]._id.toString();
+    const opsUserId = users[2]._id.toString();
     const auditEntries = [
-      { userId: adminUserId, userEmail: "admin@astroguard.local", userRole: "admin", action: "USER_CREATED", resource: "User", metadata: { email: "alex@astroguard.local", role: "astronaut" }, success: true },
-      { userId: adminUserId, userEmail: "admin@astroguard.local", userRole: "admin", action: "USER_CREATED", resource: "User", metadata: { email: "medical@astroguard.local", role: "medical_officer" }, success: true },
-      { userId: adminUserId, userEmail: "admin@astroguard.local", userRole: "admin", action: "MISSION_CREATED", resource: "Mission", metadata: { name: "Ares Mission 01" }, success: true },
-      { userId: adminUserId, userEmail: "admin@astroguard.local", userRole: "admin", action: "ASTRONAUT_ASSIGNED", resource: "Mission", resourceId: "ARES-01", metadata: { astronautId: "AST-001" }, success: true },
-      { userId: adminUserId, userEmail: "admin@astroguard.local", userRole: "admin", action: "ASTRONAUT_ASSIGNED", resource: "Mission", resourceId: "ARES-01", metadata: { astronautId: "AST-002" }, success: true },
-      { userId: adminUserId, userEmail: "admin@astroguard.local", userRole: "admin", action: "USER_CREATED", resource: "User", metadata: { email: "mission@astroguard.local", role: "mission_control" }, success: true },
-      { userId: adminUserId, userEmail: "admin@astroguard.local", userRole: "admin", action: "ROLE_CHANGED", resource: "User", metadata: { from: "astronaut", to: "mission_control", email: "mission@astroguard.local" }, success: true },
+      { userId: opsUserId, userEmail: "mission@astroguard.local", userRole: "mission_control", action: "USER_CREATED", resource: "User", metadata: { email: "alex@astroguard.local", role: "astronaut" }, success: true },
+      { userId: opsUserId, userEmail: "mission@astroguard.local", userRole: "mission_control", action: "USER_CREATED", resource: "User", metadata: { email: "medical@astroguard.local", role: "medical_officer" }, success: true },
+      { userId: opsUserId, userEmail: "mission@astroguard.local", userRole: "mission_control", action: "MISSION_CREATED", resource: "Mission", metadata: { name: "Ares Mission 01" }, success: true },
+      { userId: opsUserId, userEmail: "mission@astroguard.local", userRole: "mission_control", action: "ASTRONAUT_ASSIGNED", resource: "Mission", resourceId: "ARES-01", metadata: { astronautId: "AST-001" }, success: true },
+      { userId: opsUserId, userEmail: "mission@astroguard.local", userRole: "mission_control", action: "ASTRONAUT_ASSIGNED", resource: "Mission", resourceId: "ARES-01", metadata: { astronautId: "AST-002" }, success: true },
+      { userId: opsUserId, userEmail: "mission@astroguard.local", userRole: "mission_control", action: "USER_CREATED", resource: "User", metadata: { email: "mission@astroguard.local", role: "mission_control" }, success: true },
+      { userId: opsUserId, userEmail: "mission@astroguard.local", userRole: "mission_control", action: "ROLE_CHANGED", resource: "User", metadata: { from: "astronaut", to: "mission_control", email: "mission@astroguard.local" }, success: true },
     ];
     await AuditLog.insertMany(
       auditEntries.map((e) => ({
@@ -459,7 +456,6 @@ const seedDatabase = async () => {
 -------------------------------------------------------------------
 ROLE              EMAIL                          ASTRONAUT ID
 -------------------------------------------------------------------
-Administrator:    admin@astroguard.local
 Medical Officer:  medical@astroguard.local       (assigned: AST-001..004)
 Medical Officer:  medical2@astroguard.local      (assigned: AST-003..004)
 Mission Control:  mission@astroguard.local       (mission: Ares Mission 01)

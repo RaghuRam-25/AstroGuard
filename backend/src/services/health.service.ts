@@ -9,6 +9,11 @@ export interface IngestHealthInput {
   spo2: number;
   sleep: number;
   activity: number;
+  ecg?: IHealthData["ecg"];
+  bloodPressure?: IHealthData["bloodPressure"];
+  coreTemperatureC?: number;
+  respirationRate?: number;
+  microgravityStressIndex?: number;
   notes?: string;
   source?: "manual" | "sensor" | "csv";
   timestamp?: Date;
@@ -45,6 +50,11 @@ export class HealthService {
       spo2: input.spo2,
       sleep: input.sleep,
       activity: input.activity,
+      ecg: input.ecg,
+      bloodPressure: input.bloodPressure,
+      coreTemperatureC: input.coreTemperatureC,
+      respirationRate: input.respirationRate,
+      microgravityStressIndex: input.microgravityStressIndex,
       notes: input.notes || "",
       source: input.source || "manual",
       timestamp: input.timestamp || new Date(),

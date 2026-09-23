@@ -4,11 +4,13 @@ const ROLE_ROUTES: Record<string, string> = {
   astronaut: "/astronaut",
   medical_officer: "/medical",
   mission_control: "/mission-control",
-  admin: "/admin",
 };
 
-const PROTECTED_PREFIXES = ["/astronaut", "/medical", "/mission-control", "/admin"];
-const PUBLIC_ROUTES = ["/", "/login", "/register", "/about", "/unauthorized"];
+const PROTECTED_PREFIXES = ["/astronaut", "/medical", "/mission-control"];
+const PUBLIC_ROUTES = ["/", "/login", "/register", "/about", "/mission", "/contact", "/sensors", "/unauthorized"];
+
+// Alerts are restricted to Flight Surgeons and Mission Controllers.
+const ALERTS_ALLOWED_ROLES = ["medical_officer", "mission_control"];
 
 export function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
@@ -25,6 +27,30 @@ export function middleware(req: NextRequest) {
   }
 
   const isProtected = PROTECTED_PREFIXES.some((prefix) => pathname.startsWith(prefix));
+
+  // "/alerts" must only be reachable by Dr / Flight Surgeon or Mission
+  // Controller. Astronauts and other roles are redirected to the
+  // unauthorized screen.
+  if (pathname === "/alerts" || pathname.startsWith("/alerts/")) {
+    const token = req.cookies.get("astro_token")?.value;
+    if (token) {
+      try {
+        const payloadBase64 = token.split(".")[1];
+        if (payloadBase64) {
+          const payload = JSON.parse(atob(payloadBase64.replace(/-/g, "+").replace(/_/g, "/")));
+          if (!ALERTS_ALLOWED_ROLES.includes(payload.role)) {
+            const unauthorizedUrl = req.nextUrl.clone();
+            unauthorizedUrl.pathname = "/unauthorized";
+            return NextResponse.redirect(unauthorizedUrl);
+          }
+        }
+      } catch {
+        return NextResponse.next();
+      }
+    }
+    return NextResponse.next();
+  }
+
   if (!isProtected) {
     return NextResponse.next();
   }

@@ -399,7 +399,7 @@ export const aiHealthInsight = {
 export const quickActions = [
   { label: "Enter Health Data", href: "/astronaut/data-input" },
   { label: "View AI Analysis", href: "/astronaut/ai-analysis" },
-  { label: "View Alerts", href: "/astronaut/alerts" },
+  { label: "Scan RFID Meal Pack", href: "/astronaut/dashboard" },
   { label: "View Health History", href: "/astronaut/health" },
 ];
 

@@ -9,7 +9,6 @@ const ROLE_REDIRECTS: Record<string, string> = {
   astronaut: "/astronaut/health",
   medical_officer: "/medical/dashboard",
   mission_control: "/mission-control/dashboard",
-  admin: "/admin/dashboard",
 };
 
 export default function LoginForm() {
@@ -42,13 +41,6 @@ export default function LoginForm() {
       email: "mission@astroguard.local",
       password: "AstroGuard@2025!",
       badge: "bg-purple-500/15 text-purple-400 border-purple-500/30",
-    },
-    {
-      label: "Mission Administrator",
-      role: "Admin",
-      email: "admin@astroguard.local",
-      password: "AstroGuard@2025!",
-      badge: "bg-amber-500/15 text-amber-400 border-amber-500/30",
     },
   ];
 
