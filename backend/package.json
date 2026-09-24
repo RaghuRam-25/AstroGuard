@@ -11,6 +11,7 @@
     "build": "tsc",
     "start": "node dist/server.js",
     "seed": "tsx src/utils/seed.ts",
+    "seed:demo": "tsx src/utils/seedDemo.ts",
     "test": "tsc && node --import tsx --test test/*.test.ts"
   },
   "keywords": [

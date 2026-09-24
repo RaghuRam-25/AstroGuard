@@ -16,11 +16,44 @@ export class MissionControlController {
     return Astronaut.findOne({ astronautId, ...(missions.length ? { mission: { $in: missions } } : {}) }).lean();
   }
 
+  /**
+   * The ONLY legitimate astronauts are registered, active User accounts whose
+   * role is exactly "astronaut" (the schema enum value). Astronaut profile
+   * documents alone — seeded/demo crew, leftovers from deleted accounts, or
+   * telemetry-generated records — are NOT crew and must never count or list.
+   * Mission scoping uses each astronaut User's missionIds so each dashboard
+   * only sees astronauts assigned to the missions the Mission Control user
+   * itself is assigned to.
+   */
+  private static async scopedRegisteredAstronauts(missionNames: string[]) {
+    const astronautUsers = await User.find({
+      role: "astronaut",
+      isActive: true,
+      astronautId: { $exists: true, $ne: "" },
+      ...(missionNames.length ? { missionIds: { $in: missionNames } } : {}),
+    })
+      .select("name email astronautId missionIds")
+      .sort({ name: 1 })
+      .lean();
+
+    const astronautIds = [
+      ...new Set(astronautUsers.map((item) => item.astronautId).filter((id): id is string => Boolean(id))),
+    ];
+    const profiles = astronautIds.length
+      ? await Astronaut.find({
+          astronautId: { $in: astronautIds },
+          ...(missionNames.length ? { mission: { $in: missionNames } } : {}),
+        }).lean()
+      : [];
+    const profileById = new Map(profiles.map((profile) => [profile.astronautId, profile]));
+    return { astronautUsers, astronautIds, profileById };
+  }
+
   public static async getDirectives(req: Request, res: Response, next: NextFunction) {
     try {
       const missionIds = req.user!.missionIds || [];
-      const astronauts = await Astronaut.find(missionIds.length ? { mission: { $in: missionIds } } : {}).select("astronautId").lean();
-      const directives = await AuthorityDirective.find({ astronautId: { $in: astronauts.map((item) => item.astronautId) } }).sort({ createdAt: -1 }).limit(100).lean();
+      const { astronautIds } = await MissionControlController.scopedRegisteredAstronauts(missionIds);
+      const directives = await AuthorityDirective.find({ astronautId: { $in: astronautIds } }).sort({ createdAt: -1 }).limit(100).lean();
       return successResponse(res, { directives }, 200);
     } catch (error) { next(error); }
   }
@@ -199,9 +232,8 @@ export class MissionControlController {
         return errorResponse(res, `Forbidden: You are not assigned to mission '${missionId}'.`, 403);
       }
 
-      // Get all astronauts in this mission
-      const astronauts = await Astronaut.find({ mission: mission.name });
-      const astronautIds = astronauts.map((a) => a.astronautId);
+      // Get all astronauts in this mission (registered accounts only)
+      const { astronautIds } = await MissionControlController.scopedRegisteredAstronauts([mission.name, mission.missionId]);
 
       // Aggregate latest analysis for each astronaut
       const analyses = await Promise.all(
@@ -240,7 +272,7 @@ export class MissionControlController {
         res,
         {
           mission,
-          crewSize: astronauts.length,
+          crewSize: astronautIds.length,
           distribution,
           activeAlerts,
         },
@@ -276,23 +308,26 @@ export class MissionControlController {
         return errorResponse(res, `Forbidden: Not assigned to mission '${missionId}'.`, 403);
       }
 
-      const astronauts = await Astronaut.find({ mission: mission.name }).sort({ name: 1 });
+      const { astronautUsers, astronautIds, profileById } =
+        await MissionControlController.scopedRegisteredAstronauts([mission.name, mission.missionId]);
 
       const crew = await Promise.all(
-        astronauts.map(async (ast) => {
+        astronautUsers.map(async (user) => {
+          const astronautId = user.astronautId as string;
+          const profile = profileById.get(astronautId);
           const [readiness, unresolvedAlerts] = await Promise.all([
-            MissionControlController.readiness(ast.astronautId),
-            Alert.countDocuments({ astronautId: ast.astronautId, resolved: false }),
+            MissionControlController.readiness(astronautId),
+            Alert.countDocuments({ astronautId, resolved: false }),
           ]);
 
           return {
-            astronautId: ast.astronautId,
-            name: ast.name,
-            role: ast.role,
-            missionDay: ast.missionDay,
-            missionPhase: ast.missionPhase,
-            status: ast.status,
-            avatar: ast.avatar,
+            astronautId,
+            name: user.name,
+            role: profile?.role || "Astronaut",
+            missionDay: profile?.missionDay ?? null,
+            missionPhase: profile?.missionPhase ?? null,
+            status: profile?.status || "Registered",
+            avatar: profile?.avatar,
             ...readiness,
             unresolvedAlerts,
           };
@@ -330,8 +365,7 @@ export class MissionControlController {
         return errorResponse(res, `Forbidden: Not assigned to mission '${missionId}'.`, 403);
       }
 
-      const astronauts = await Astronaut.find({ mission: mission.name }).select("astronautId");
-      const astronautIds = astronauts.map((a) => a.astronautId);
+      const { astronautIds } = await MissionControlController.scopedRegisteredAstronauts([mission.name, mission.missionId]);
 
       const alerts = await Alert.find({ astronautId: { $in: astronautIds } }).sort({ createdAt: -1 }).select("astronautId severity resolved createdAt").lean();
       const masked = await Promise.all(alerts.map(async (alert) => ({ astronautId: alert.astronautId, severity: alert.severity, resolved: alert.resolved, createdAt: alert.createdAt, ...(await MissionControlController.readiness(alert.astronautId)) })));
@@ -366,8 +400,7 @@ export class MissionControlController {
         return errorResponse(res, `Forbidden: Not assigned to mission '${missionId}'.`, 403);
       }
 
-      const astronauts = await Astronaut.find({ mission: mission.name }).select("astronautId name");
-      const astronautIds = astronauts.map((a) => a.astronautId);
+      const { astronautIds } = await MissionControlController.scopedRegisteredAstronauts([mission.name, mission.missionId]);
 
       const readinessByAstronaut = await Promise.all(astronautIds.map(async (id) => ({ astronautId: id, ...(await MissionControlController.readiness(id)) })));
       const riskDistribution = { GREEN: 0, YELLOW: 0, RED: 0 };
@@ -386,7 +419,7 @@ export class MissionControlController {
           readinessByAstronaut,
           riskDistribution,
           alertSummary,
-          crewCount: astronauts.length,
+          crewCount: astronautIds.length,
         },
         200
       );
@@ -402,8 +435,9 @@ export class MissionControlController {
    */
   public static async getDashboardSummary(req: Request, res: Response, next: NextFunction) {
     try {
-      const astronauts = await Astronaut.find({}).sort({ name: 1 }).lean();
-      const astronautIds = astronauts.map((ast) => ast.astronautId);
+      const missionScope = req.user!.missionIds || [];
+      const { astronautUsers, astronautIds, profileById } =
+        await MissionControlController.scopedRegisteredAstronauts(missionScope);
 
       const [officers, alerts, openAggregates] = await Promise.all([
         User.find({ role: "medical_officer", isActive: true })
@@ -450,19 +484,21 @@ export class MissionControlController {
         openAggregates.map((row: any) => [String(row._id), { count: row.count, maxSev: row.maxSev }])
       );
       const sevLabel: Record<number, string> = { 4: "Critical", 3: "Warning", 2: "Watch", 1: "Normal" };
-      const astronautById = new Map(astronauts.map((ast) => [ast.astronautId, ast]));
 
-      const roster = astronauts.map((ast) => {
-        const doctor = doctorByAstronaut.get(ast.astronautId);
-        const open = openByAstronaut.get(ast.astronautId);
+      const roster = astronautUsers.map((user) => {
+        const astronautId = user.astronautId as string;
+        const doctor = doctorByAstronaut.get(astronautId);
+        const open = openByAstronaut.get(astronautId);
+        const profile = profileById.get(astronautId);
         return {
-          astronautId: ast.astronautId,
-          name: ast.name,
-          role: ast.role,
-          mission: ast.mission,
-          status: ast.status,
-          avatar: ast.avatar,
-          online: ast.status === "Active" || ast.status === "Nominal",
+          astronautId,
+          name: user.name,
+          email: user.email,
+          role: profile?.role ? String(profile.role) : "Astronaut",
+          mission: profile?.mission || null,
+          status: profile?.status ? String(profile.status) : "Registered",
+          avatar: profile?.avatar ? String(profile.avatar) : "AM",
+          online: profile ? profile.status === "Active" || profile.status === "Nominal" : false,
           assignedDoctorId: doctor?.id || null,
           assignedDoctorName: doctor?.name || null,
           unresolvedAlerts: open?.count || 0,
@@ -479,7 +515,7 @@ export class MissionControlController {
       }));
 
       const alertFeed = alerts.map((alert) => {
-        const ast = astronautById.get(alert.astronautId);
+        const ast = astronautUsers.find((user) => user.astronautId === alert.astronautId);
         const doctor = doctorByAstronaut.get(alert.astronautId);
         return {
           id: String(alert._id),
@@ -510,13 +546,13 @@ export class MissionControlController {
           doctors,
           alerts: alertFeed,
           counts: {
-            totalAstronauts: astronauts.length,
+            totalAstronauts: astronautIds.length,
             onlineAstronauts: roster.filter((row) => row.online).length,
             totalDoctors: doctors.length,
             openAlerts: openAlertCount,
             criticalAlerts: criticalAlertCount,
             unassignedAlerts: unassignedAlertCount,
-            assignedMissions: new Set(astronauts.map((astronaut) => astronaut.mission).filter(Boolean)).size,
+            assignedMissions: new Set(roster.map((row) => row.mission).filter(Boolean)).size,
           },
         },
         200
