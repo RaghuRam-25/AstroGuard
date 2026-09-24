@@ -2,7 +2,7 @@
 
 import React, { createContext, useContext, useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
-import { apiRequest } from "../lib/api";
+import { apiRequest, refreshAccessToken, resetRefreshGate } from "../lib/api";
 
 export type UserRole = "astronaut" | "medical_officer" | "mission_control" | "admin";
 
@@ -55,11 +55,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       let res = await apiRequest<{ user: AuthUser }>("/api/auth/me");
       if (!res.success && res.status === 401) {
-        const refreshRes = await apiRequest<{ user: AuthUser }>("/api/auth/refresh", {
-          method: "POST",
-        });
-        if (refreshRes.success && refreshRes.data?.user) {
-          res = refreshRes;
+        if (await refreshAccessToken()) {
+          res = await apiRequest<{ user: AuthUser }>("/api/auth/me", {}, false);
         }
       }
 
@@ -88,6 +85,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       });
 
       if (res.success && res.data?.user) {
+        resetRefreshGate();
         setUser(res.data.user);
         return { success: true, user: res.data.user };
       } else {
@@ -108,6 +106,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     } catch (err) {
       console.error("Logout error:", err);
     } finally {
+      resetRefreshGate();
       setUser(null);
       router.replace("/");
     }

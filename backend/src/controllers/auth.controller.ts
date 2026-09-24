@@ -222,6 +222,9 @@ export class AuthController {
     try {
       const refreshToken = req.cookies?.astro_refresh;
       if (!refreshToken) {
+        console.warn(
+          `[auth.refresh] refresh cookie missing -> 401 | ${req.method} ${req.path} | hasAccessCookie=${Boolean(req.cookies?.astro_token)}`
+        );
         return errorResponse(res, "Refresh token missing.", 401);
       }
 
@@ -229,12 +232,16 @@ export class AuthController {
       try {
         payload = verifyRefreshToken(refreshToken);
       } catch (err) {
+        console.warn(
+          `[auth.refresh] invalid/expired refresh token -> 401 | ${req.method} ${req.path} | category=${String((err as any)?.name || "unknown")}`
+        );
         clearAuthCookies(res);
         return errorResponse(res, "Invalid or expired refresh token.", 401);
       }
 
       const user = await User.findById(payload.id);
       if (!user || !user.isActive) {
+        console.warn(`[auth.refresh] user missing/inactive -> 401 | ${req.method} ${req.path}`);
         clearAuthCookies(res);
         return errorResponse(res, "User not found or inactive.", 401);
       }

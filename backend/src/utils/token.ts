@@ -41,6 +41,15 @@ export const verifyRefreshToken = (token: string): { id: string } => {
   return jwt.verify(token, env.REFRESH_TOKEN_SECRET) as { id: string };
 };
 
+// SameSite policy:
+// - Local development (localhost:3000 -> localhost:5000) is SAME-SITE, so "lax"
+//   works and keeps dev simple (no Secure required over http).
+// - Production (Vercel -> Render, different registrable domains) is CROSS-SITE.
+//   Browsers will not send SameSite=Lax cookies on cross-site fetch() requests,
+//   which silently breaks every protected API call and the refresh flow.
+//   Cross-site cookies require SameSite=None AND Secure.
+const cookieSameSite = (env.NODE_ENV === "production" ? "none" : "lax") as "none" | "lax";
+
 export const setAuthCookies = (
   res: Response,
   accessToken: string,
@@ -52,7 +61,7 @@ export const setAuthCookies = (
   res.cookie("astro_token", accessToken, {
     httpOnly: true,
     secure: isProduction,
-    sameSite: "lax",
+    sameSite: cookieSameSite,
     maxAge: 15 * 60 * 1000, // 15 min
     path: "/",
   });
@@ -62,7 +71,7 @@ export const setAuthCookies = (
     res.cookie("astro_refresh", refreshToken, {
       httpOnly: true,
       secure: isProduction,
-      sameSite: "lax",
+      sameSite: cookieSameSite,
       maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
       path: "/",
     });
@@ -74,7 +83,7 @@ export const clearAuthCookies = (res: Response) => {
   const cookieOptions = {
     httpOnly: true,
     secure: isProduction,
-    sameSite: "lax" as const,
+    sameSite: cookieSameSite,
     path: "/",
   };
 

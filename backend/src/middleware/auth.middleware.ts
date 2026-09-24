@@ -27,6 +27,9 @@ export const authenticate = async (
     }
 
     if (!token) {
+      console.warn(
+        `[auth] missing credentials -> 401 | ${req.method} ${req.path} | hasRefreshCookie=${Boolean(req.cookies?.astro_refresh)}`
+      );
       return errorResponse(res, "Authentication required. Please log in.", 401);
     }
 
@@ -35,6 +38,10 @@ export const authenticate = async (
     try {
       decoded = verifyAccessToken(token);
     } catch (err: any) {
+      const category = err?.name === "TokenExpiredError" ? "expired" : `invalid (${String(err?.name || "unknown")})`;
+      console.warn(
+        `[auth] ${category} access token -> 401 | ${req.method} ${req.path} | hasRefreshCookie=${Boolean(req.cookies?.astro_refresh)}`
+      );
       if (err.name === "TokenExpiredError") {
         return errorResponse(res, "Session expired. Please refresh or log in again.", 401);
       }
@@ -44,6 +51,7 @@ export const authenticate = async (
     // Find user in DB
     const user = await User.findById(decoded.id);
     if (!user) {
+      console.warn(`[auth] unknown user id -> 401 | ${req.method} ${req.path}`);
       return errorResponse(res, "User not found or account removed.", 401);
     }
 

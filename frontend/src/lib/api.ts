@@ -4,6 +4,50 @@ const configuredApiUrl = process.env.NEXT_PUBLIC_API_URL?.trim();
 export const API_BASE_URL =
   configuredApiUrl || (process.env.NODE_ENV === "development" ? "http://localhost:5000" : "");
 
+// ─────────────────────────────────────────────────────────
+//  Token refresh coordination
+//
+//  Multiple components fire protected requests at the same
+//  time. Each 401 would otherwise trigger its own refresh,
+//  flooding /api/auth/refresh. We single-flight concurrent
+//  refreshes and add a short cooldown after a *failed* refresh
+//  so the endpoint is not hammered repeatedly (the exact
+//  "POST /api/auth/refresh -> 401" storm seen in production).
+// ─────────────────────────────────────────────────────────
+let refreshInFlight: Promise<boolean> | null = null;
+let lastRefreshFailedAt = 0;
+const REFRESH_COOLDOWN_MS = 10_000;
+
+export async function refreshAccessToken(): Promise<boolean> {
+  if (Date.now() - lastRefreshFailedAt < REFRESH_COOLDOWN_MS) {
+    return false;
+  }
+  if (refreshInFlight) {
+    return refreshInFlight;
+  }
+
+  refreshInFlight = (async () => {
+    const res = await apiRequest("/api/auth/refresh", { method: "POST" }, false);
+    const ok = res.success;
+    if (!ok) {
+      lastRefreshFailedAt = Date.now();
+    }
+    return ok;
+  })();
+
+  try {
+    return await refreshInFlight;
+  } finally {
+    refreshInFlight = null;
+  }
+}
+
+/** Call after a successful login (or logout) so a fresh session can refresh again. */
+export function resetRefreshGate() {
+  lastRefreshFailedAt = 0;
+  refreshInFlight = null;
+}
+
 export interface ApiResponse<T = unknown> {
   success: boolean;
   message?: string;
@@ -52,8 +96,7 @@ export async function apiRequest<T = unknown>(
       endpoint !== "/api/auth/refresh" &&
       endpoint !== "/api/auth/logout"
     ) {
-      const refreshRes = await apiRequest("/api/auth/refresh", { method: "POST" }, false);
-      if (refreshRes.success) {
+      if (await refreshAccessToken()) {
         return apiRequest<T>(endpoint, options, false);
       }
     }
