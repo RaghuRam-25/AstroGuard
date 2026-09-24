@@ -23,7 +23,7 @@ export default function MedicalConsultHub() {
   const [typing, setTyping] = useState(false);
   const [online, setOnline] = useState(false);
   const [socketReady, setSocketReady] = useState(false);
-  const [incoming, setIncoming] = useState<{ callerId: string; callerName: string; callType: CallType; offer: RTCSessionDescriptionInit } | null>(null);
+  const [incoming, setIncoming] = useState<{ callerId: string; callerName: string; callType: CallType; offer: RTCSessionDescriptionInit; roomSlug?: string } | null>(null);
   const [activeCall, setActiveCall] = useState<{ type: CallType; caller: boolean } | null>(null);
   const [muted, setMuted] = useState(false);
   const [cameraOff, setCameraOff] = useState(false);
@@ -43,6 +43,7 @@ export default function MedicalConsultHub() {
   const callStartedRef = useRef<number>(0);
   const callerRef = useRef(false);
   const callTypeRef = useRef<CallType>("Audio");
+  const incomingRef = useRef<string | undefined>(undefined);
 
   useEffect(() => { peerRef.current = peer; }, [peer]);
 
@@ -67,7 +68,7 @@ export default function MedicalConsultHub() {
   useEffect(() => { if (peer) void Promise.resolve().then(() => loadConversation(peer)); }, [peer, loadConversation]);
   useEffect(() => { if (socketReady && peers.length) socketRef.current?.emit("presence:check", { userIds: peers.map((item) => item.id) }); }, [socketReady, peers]);
 
-  const emitSignal = useCallback((signal: Signal, receiverId = peerRef.current?.id) => { if (receiverId) socketRef.current?.emit("call:signal", { receiverId, signal }); }, []);
+  const emitSignal = useCallback((signal: Signal, receiverId = peerRef.current?.id) => { if (receiverId) socketRef.current?.emit("call:signal", { receiverId, roomSlug: incomingRef.current, signal }); }, []);
 
   const closeCall = useCallback(async (status: "Completed" | "Rejected" | "Cancelled" = "Completed") => {
     const currentPeer = peerRef.current;
@@ -103,7 +104,8 @@ export default function MedicalConsultHub() {
       callerRef.current = true; callStartedRef.current = Date.now(); callTypeRef.current = type;
       const pc = preparePeerConnection(peer.id, type); await getLocalMedia(type);
       const offer = await pc.createOffer(); await pc.setLocalDescription(offer);
-      socketRef.current?.emit("call:invite", { receiverId: peer.id, callType: type, offer });
+      const roomSlug = user?.id ? `telemedicine-${user.id}-${peer.id}` : undefined;
+      socketRef.current?.emit("call:invite", { receiverId: peer.id, callType: type, roomSlug, offer });
       setActiveCall({ type, caller: true });
     } catch { setError("Camera or microphone permission was not available."); await closeCall("Cancelled"); }
   };
@@ -116,7 +118,7 @@ export default function MedicalConsultHub() {
       await pc.setRemoteDescription(call.offer);
       for (const candidate of pendingCandidatesRef.current) await pc.addIceCandidate(candidate); pendingCandidatesRef.current = [];
       const answer = await pc.createAnswer(); await pc.setLocalDescription(answer);
-      socketRef.current?.emit("call:signal", { receiverId: call.callerId, signal: { type: "answer", sdp: answer } });
+      socketRef.current?.emit("call:signal", { receiverId: call.callerId, roomSlug: call.roomSlug, signal: { type: "answer", sdp: answer } });
       setPeer((current) => current?.id === call.callerId ? current : peers.find((item) => item.id === call.callerId) || current);
       setActiveCall({ type: call.callType, caller: false }); setIncoming(null);
     } catch { setError("Unable to accept the medical call."); await closeCall("Cancelled"); }
@@ -132,7 +134,7 @@ export default function MedicalConsultHub() {
     socket.on("presence:update", (payload: { userId: string; online: boolean }) => { if (payload.userId === peerRef.current?.id) setOnline(payload.online); });
     socket.on("chat:message", (message: Message) => { if (message.senderId === peerRef.current?.id || message.receiverId === peerRef.current?.id) { setMessages((current) => current.some((item) => (item._id || item.id) === (message._id || message.id)) ? current : [...current, message]); if (message.senderId === peerRef.current?.id) void markMedicalCommunicationRead(peerRef.current.id); } });
     socket.on("chat:typing", (payload: { senderId: string; typing: boolean }) => { if (payload.senderId === peerRef.current?.id) setTyping(payload.typing); });
-    socket.on("call:incoming", (payload: { callerId: string; callerName: string; callType: CallType; offer: RTCSessionDescriptionInit }) => setIncoming(payload));
+    socket.on("call:incoming", (payload: { callerId: string; callerName: string; callType: CallType; offer: RTCSessionDescriptionInit; roomSlug?: string }) => { incomingRef.current = payload.roomSlug; setIncoming(payload); });
     socket.on("call:signal", async (payload: { senderId: string; signal: Signal }) => { const pc = pcRef.current; if (!pc) return; if (payload.signal.type === "answer" && payload.signal.sdp) await pc.setRemoteDescription(payload.signal.sdp); if (payload.signal.type === "candidate" && payload.signal.candidate) { if (pc.remoteDescription) await pc.addIceCandidate(payload.signal.candidate); else pendingCandidatesRef.current.push(payload.signal.candidate); } });
     socket.on("call:status", (payload: { status?: string }) => { if (payload.status === "Rejected") { setError("The assigned Medical Officer rejected the call."); void closeCall("Rejected"); } });
     return () => { socket.disconnect(); socketRef.current = null; void closeCall("Cancelled"); };
@@ -164,7 +166,7 @@ export default function MedicalConsultHub() {
   const toggleMute = () => { const track = localStreamRef.current?.getAudioTracks()[0]; if (track) { track.enabled = !track.enabled; setMuted(!track.enabled); } };
   const toggleCamera = () => { const track = localStreamRef.current?.getVideoTracks()[0]; if (track) { track.enabled = !track.enabled; setCameraOff(!track.enabled); } };
   const shareScreen = async () => { if (!pcRef.current || callTypeRef.current !== "Video") return; try { const screen = await navigator.mediaDevices.getDisplayMedia({ video: true }); const sender = pcRef.current.getSenders().find((item) => item.track?.kind === "video"); if (sender && screen.getVideoTracks()[0]) { await sender.replaceTrack(screen.getVideoTracks()[0]); screen.getVideoTracks()[0].onended = () => { const camera = localStreamRef.current?.getVideoTracks()[0]; if (camera) void sender.replaceTrack(camera); }; } } catch { /* screen share is optional */ } };
-  const rejectCall = () => { if (incoming) socketRef.current?.emit("call:status", { receiverId: incoming.callerId, status: "Rejected" }); setIncoming(null); };
+  const rejectCall = () => { if (incoming) socketRef.current?.emit("call:status", { receiverId: incoming.callerId, roomSlug: incoming.roomSlug, status: "Rejected" }); setIncoming(null); };
   const formatTime = (seconds: number) => `${Math.floor(seconds / 60).toString().padStart(2, "0")}:${(seconds % 60).toString().padStart(2, "0")}`;
 
   return <div className="mx-auto flex max-w-6xl flex-col gap-4" onClick={() => error && setError(null)}>

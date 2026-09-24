@@ -1,5 +1,7 @@
 import { Request, Response, NextFunction } from "express";
+import mongoose from "mongoose";
 import { Astronaut } from "../models/Astronaut.js";
+import { User } from "../models/User.js";
 import { HealthData } from "../models/HealthData.js";
 import { Analysis } from "../models/Analysis.js";
 import { Alert } from "../models/Alert.js";
@@ -58,6 +60,11 @@ export class MedicalController {
   private static async buildCrewSummary(astronautIds: string[]) {
     if (!astronautIds.length) return [];
     const astronauts = await Astronaut.find({ astronautId: { $in: astronautIds } }).sort({ name: 1 });
+    const doctorIds = [...new Set(astronauts.map((ast) => String(ast.assignedDoctorId)).filter((id) => mongoose.isValidObjectId(id)))];
+    const doctors = doctorIds.length
+      ? await User.find({ _id: { $in: doctorIds } }).select("name email isActive").lean()
+      : [];
+    const doctorMap = new Map(doctors.map((doc) => [String(doc._id), doc]));
     return Promise.all(
       astronauts.map(async (ast) => {
         const [latestHealth, latestAnalysis, unresolvedAlerts] = await Promise.all([
@@ -69,6 +76,7 @@ export class MedicalController {
             .select("anomalyScore riskLevel confidence createdAt"),
           Alert.countDocuments({ astronautId: ast.astronautId, resolved: false }),
         ]);
+        const assignedDoctor = ast.assignedDoctorId ? (doctorMap.get(String(ast.assignedDoctorId)) ?? null) : null;
 
         return {
           astronautId: ast.astronautId,
@@ -79,6 +87,8 @@ export class MedicalController {
           missionPhase: ast.missionPhase,
           status: ast.status,
           avatar: ast.avatar,
+          assignedDoctorId: ast.assignedDoctorId ?? null,
+          assignedDoctor: assignedDoctor ?? null,
           latestHealth,
           latestAnalysis,
           unresolvedAlerts,
@@ -104,14 +114,21 @@ export class MedicalController {
 
   /**
    * GET /api/medical/my-astronauts (also /api/v1/medical/my-astronauts)
-   * Strictly-scoped assignment list: only astronauts on this officer's
-   * User.assignedAstronautIds roster OR a current MedicalAssignment.
+   * Strictly-scoped assignment list for the authenticated Medical Officer.
+   * `doctorId` is resolved ONLY from the validated session (req.user._id),
+   * never from a client body/query, and the roster is resolved from the
+   * canonical Astronaut.assignedDoctorId field plus legacy
+   * User.assignedAstronautIds / MedicalAssignment stores so older pairings
+   * remain visible. Responses carry Cache-Control: no-store so Mission
+   * Control's latest assignment is never served stale or empty.
    */
   public static async getMyAstronauts(req: Request, res: Response, next: NextFunction) {
     try {
+      const doctorId = req.user!._id.toString();
       const assignedIds = await MedicalController.assignedAstronautIds(req);
       const astronauts = await MedicalController.buildCrewSummary(assignedIds);
-      return successResponse(res, { astronauts, total: astronauts.length }, 200);
+      res.setHeader("Cache-Control", "no-store, max-age=0, must-revalidate");
+      return successResponse(res, { doctorId, astronauts, total: astronauts.length }, 200);
     } catch (error) {
       next(error);
     }

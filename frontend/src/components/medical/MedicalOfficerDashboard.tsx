@@ -34,6 +34,7 @@ export default function MedicalOfficerDashboard() {
   const [callOpen, setCallOpen] = useState(false);
   const [callType, setCallType] = useState<"Audio" | "Video">("Audio");
   const [callSequence, setCallSequence] = useState(0);
+  const [callMeta, setCallMeta] = useState<{ callerId: string; receiverId: string; roomSlug: string } | null>(null);
   const [toast, setToast] = useState<string | null>(null);
   const senderRef = useRef<HTMLDivElement | null>(null);
   const toastTimerRef = useRef<number | undefined>(undefined);
@@ -58,7 +59,19 @@ export default function MedicalOfficerDashboard() {
     }
   }, []);
 
-  useEffect(() => { void Promise.resolve().then(() => loadCrew()); }, [loadCrew]);
+  useEffect(() => {
+    void Promise.resolve().then(() => loadCrew());
+    const interval = window.setInterval(() => { void loadCrew(); }, 5000);
+    const onFocus = () => { void loadCrew(); };
+    const onVisible = () => { if (document.visibilityState === "visible") void loadCrew(); };
+    window.addEventListener("focus", onFocus);
+    document.addEventListener("visibilitychange", onVisible);
+    return () => {
+      window.clearInterval(interval);
+      window.removeEventListener("focus", onFocus);
+      document.removeEventListener("visibilitychange", onVisible);
+    };
+  }, [loadCrew]);
 
   useEffect(() => {
     if (!selectedId) return;
@@ -92,7 +105,20 @@ export default function MedicalOfficerDashboard() {
   }, [crew]);
 
   const openCall = (type: "Audio" | "Video") => {
-    if (!selectedPeer) { showToast("No active comms channel for this astronaut."); return; }
+    // Validate the assigned astronaut is selected before touching WebRTC.
+    if (!selectedCrew) { showToast("Select an assigned astronaut to begin the link."); return; }
+    const callerId = user?.id;
+    if (!callerId) { showToast("Secure session could not be resolved. Please re-authenticate."); return; }
+    const receiver = selectedPeer;
+    if (!receiver?.id) {
+      // Astronaut is on the roster but has no reachable comms peer: surface
+      // a friendly offline state instead of a silently disabled button.
+      showToast("Astronaut is currently offline or telemetry signal is lost. Telemedicine link unavailable.");
+      return;
+    }
+    const receiverId = receiver.id;
+    const roomSlug = `telemedicine-${callerId}-${receiverId}`;
+    setCallMeta({ callerId, receiverId, roomSlug });
     setCallType(type);
     setCallSequence((current) => current + 1);
     setCallOpen(true);
@@ -221,13 +247,15 @@ export default function MedicalOfficerDashboard() {
         </div>
       </div>
 
-      {selectedPeer && (
+      {selectedPeer && callMeta && (
         <CallModal
           key={callSequence}
           open={callOpen}
-          peerId={selectedPeer.id}
+          peerId={callMeta.receiverId}
           peerName={selectedCrew?.name || selectedPeer.name}
           callType={callType}
+          callerId={callMeta.callerId}
+          roomSlug={callMeta.roomSlug}
           onClose={() => setCallOpen(false)}
         />
       )}

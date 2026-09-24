@@ -60,20 +60,21 @@ export function attachCommunicationSocket(server: HttpServer) {
       });
     });
 
-    socket.on("call:invite", async (payload: { receiverId?: string; callType?: "Audio" | "Video"; offer?: unknown }) => {
+    socket.on("call:invite", async (payload: { receiverId?: string; callerId?: string; callType?: "Audio" | "Video"; roomSlug?: string; offer?: unknown }) => {
       const receiverId = String(payload?.receiverId || "");
       if (!(await getCommunicationPeer(user, receiverId))) return socket.emit("communication:error", { message: "Call peer is not assigned to you." });
-      io.to(`user:${receiverId}`).emit("call:incoming", { callerId: userId, callerName: user.name, callType: payload.callType === "Video" ? "Video" : "Audio", offer: payload.offer });
+      const roomSlug = typeof payload?.roomSlug === "string" ? payload.roomSlug.slice(0, 160) : undefined;
+      io.to(`user:${receiverId}`).emit("call:incoming", { callerId: userId, callerName: user.name, callType: payload.callType === "Video" ? "Video" : "Audio", roomSlug, offer: payload.offer });
     });
 
-    socket.on("call:signal", async (payload: { receiverId?: string; signal?: unknown }) => {
+    socket.on("call:signal", async (payload: { receiverId?: string; callerId?: string; roomSlug?: string; signal?: unknown }) => {
       const receiverId = String(payload?.receiverId || "");
-      if (await getCommunicationPeer(user, receiverId)) io.to(`user:${receiverId}`).emit("call:signal", { senderId: userId, signal: payload.signal });
+      if (await getCommunicationPeer(user, receiverId)) io.to(`user:${receiverId}`).emit("call:signal", { senderId: userId, roomSlug: payload?.roomSlug, signal: payload.signal });
     });
 
-    socket.on("call:status", async (payload: { receiverId?: string; status?: string }) => {
+    socket.on("call:status", async (payload: { receiverId?: string; callerId?: string; roomSlug?: string; status?: string }) => {
       const receiverId = String(payload?.receiverId || "");
-      if (await getCommunicationPeer(user, receiverId)) io.to(`user:${receiverId}`).emit("call:status", { senderId: userId, status: payload.status });
+      if (await getCommunicationPeer(user, receiverId)) io.to(`user:${receiverId}`).emit("call:status", { senderId: userId, roomSlug: payload?.roomSlug, status: payload.status });
     });
 
     socket.on("disconnect", async () => { await emitPresence(user, false); });

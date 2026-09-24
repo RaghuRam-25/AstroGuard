@@ -284,6 +284,22 @@ export default function MissionControlDashboard() {
   };
 
   const saveDoctorAssignment = async (astronaut: Astronaut) => {
+    // "none" from the dropdown = unassign the current flight surgeon.
+    if (doctorDrafts[astronaut.id] === "none") {
+      const response = await assignMissionControlDoctor(astronaut.id, "");
+      if (!response.success) {
+        setToast(response.message || "Doctor unassignment failed.");
+        return;
+      }
+      setDoctorDrafts((current) => {
+        const next = { ...current };
+        delete next[astronaut.id];
+        return next;
+      });
+      setToast(`Flight surgeon unassigned from ${astronaut.id}.`);
+      await loadDashboard();
+      return;
+    }
     const doctorId = doctorDrafts[astronaut.id];
     if (!doctorId) return;
     const doctor = doctors.find((d) => d.id === doctorId);
@@ -628,7 +644,8 @@ function AstronautCard({
   onSaveDoctor,
   onSaveMission,
 }: AstronautCardProps) {
-  const doctorChanged = doctorDraft !== "" && doctorDraft !== (astronaut.assignedDoctorId ?? "");
+  const hasAssignedDoctor = Boolean(astronaut.assignedDoctorId);
+  const doctorChanged = doctorDraft !== "" && (hasAssignedDoctor ? doctorDraft === "none" || doctorDraft !== (astronaut.assignedDoctorId ?? "") : doctorDraft !== "");
   const missionChanged = missionDraft !== "" && missionDraft !== (astronaut.assignedMissionId ?? "");
   const assignedMission = missions.find((m) => m.id === astronaut.assignedMissionId);
   const assignedDoctor = doctors.find((d) => d.id === astronaut.assignedDoctorId);
@@ -747,6 +764,9 @@ function AstronautCard({
               }`}
             >
               <option value="">Assign doctor…</option>
+              {hasAssignedDoctor && (
+                <option value="none">Unassign doctor (clear)</option>
+              )}
               {doctors.map((doctor) => (
                 <option key={doctor.id} value={doctor.id}>
                   {doctor.name}

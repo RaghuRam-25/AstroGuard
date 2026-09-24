@@ -30,7 +30,7 @@ export class MissionControlController {
       const { astronautId, directiveType, orders } = req.body || {};
       if (!astronautId || !directiveType || !orders) return errorResponse(res, "Astronaut, directive type, and orders are required.", 400);
       if (!["EARTH_RETURN_EMERGENCY", "EVA_ABORT", "MEDICAL_QUARANTINE", "PROTOCOL_APPROVED"].includes(directiveType)) return errorResponse(res, "Unsupported directive type.", 400);
-      if (!(await this.assignedAstronaut(req.user!, astronautId))) return errorResponse(res, "Astronaut is outside your assigned mission authority.", 403);
+      if (!(await MissionControlController.assignedAstronaut(req.user!, astronautId))) return errorResponse(res, "Astronaut is outside your assigned mission authority.", 403);
       const directive = await AuthorityDirective.create({ astronautId, directiveType, orders: String(orders).slice(0, 4000), issuedBy: req.user!._id.toString(), issuedByEmail: req.user!.email, issuedByRole: req.user!.role, status: "ACTIVE_ORDER" });
       return successResponse(res, directive, 201, "Life-priority authority directive issued.");
     } catch (error) { next(error); }
@@ -40,7 +40,7 @@ export class MissionControlController {
     try {
       const directive = await AuthorityDirective.findById(req.params.id);
       if (!directive) return errorResponse(res, "Directive not found.", 404);
-      if (!(await this.assignedAstronaut(req.user!, directive.astronautId))) return errorResponse(res, "Directive is outside your assigned mission authority.", 403);
+      if (!(await MissionControlController.assignedAstronaut(req.user!, directive.astronautId))) return errorResponse(res, "Directive is outside your assigned mission authority.", 403);
       const status = String(req.body?.status || "");
       if (!["ISSUED", "ACTIVE_ORDER", "EXECUTING", "RESOLVED"].includes(status)) return errorResponse(res, "Invalid directive lifecycle status.", 400);
       directive.status = status as any; directive.updatedBy = req.user!._id.toString(); await directive.save();
@@ -535,21 +535,49 @@ export class MissionControlController {
   public static async assignDoctor(req: Request, res: Response, next: NextFunction) {
     try {
       const astronautId = String(req.body?.astronautId || "").trim();
-      const doctorId = String(req.body?.doctorId || "").trim();
-      if (!astronautId || !doctorId) {
-        return errorResponse(res, "astronautId and doctorId are required.", 400);
+      const doctorId = String(req.body?.doctorId ?? "").trim();
+      // Empty / "none" / "unassigned" doctorId means UNASSIGN.
+      const unassigning = !doctorId || doctorId === "none" || doctorId === "unassigned";
+      if (!astronautId) {
+        return errorResponse(res, "astronautId is required.", 400);
       }
-      if (!(await this.assignedAstronaut(req.user!, astronautId))) {
+      if (!(await MissionControlController.assignedAstronaut(req.user!, astronautId))) {
         return errorResponse(res, "Astronaut is outside your assigned mission authority.", 403);
       }
       const astronaut = await Astronaut.findOne({ astronautId }).lean();
       if (!astronaut) return errorResponse(res, `Astronaut '${astronautId}' not found.`, 404);
+
+      if (unassigning) {
+        // Pull the astronaut out of every officer's roster and every legacy
+        // MedicalAssignment, clear the canonical Astronaut.assignedDoctorId,
+        // and drop now-empty allocations.
+        await User.updateMany({ role: "medical_officer" }, { $pull: { assignedAstronautIds: astronautId } });
+        await MedicalAssignment.updateMany({}, { $pull: { astronautIds: astronautId } });
+        await MedicalAssignment.deleteMany({ astronautIds: { $size: 0 } });
+        await Astronaut.updateMany({ astronautId }, { $set: { assignedDoctorId: null } });
+        return successResponse(
+          res,
+          { astronaut: { astronautId, name: astronaut.name, mission: astronaut.mission, assignedDoctorId: null }, doctor: null, allocation: null },
+          200,
+          `Flight surgeon unassigned from ${astronaut.name}.`
+        );
+      }
+
       const doctor = await User.findOne({ _id: doctorId, role: "medical_officer" });
       if (!doctor) return errorResponse(res, "Medical Officer not found or not an active flight surgeon.", 404);
 
       await User.updateMany({ role: "medical_officer", _id: { $ne: doctorId } }, { $pull: { assignedAstronautIds: astronautId } });
       await User.updateOne({ _id: doctorId }, { $addToSet: { assignedAstronautIds: astronautId } });
       const updated = await User.findById(doctorId).select("name email assignedAstronautIds isActive").lean();
+
+      // Persist the canonical relation on the Astronaut record so the Medical
+      // Officer dashboard, telemedicine peer list, and Mission Control crew
+      // matrix all resolve the pairing from one source of truth.
+      await Astronaut.updateMany({ astronautId }, { $set: { assignedDoctorId: doctorId } });
+      await Astronaut.updateMany(
+        { astronautId: { $ne: astronautId }, assignedDoctorId: doctorId },
+        { $set: { assignedDoctorId: null } }
+      );
 
       await MedicalAssignment.updateMany({ medicalOfficerId: { $ne: doctorId } }, { $pull: { astronautIds: astronautId } });
       let allocation = null;
@@ -564,7 +592,7 @@ export class MissionControlController {
       return successResponse(
         res,
         {
-          astronaut: { astronautId, name: astronaut.name, mission: astronaut.mission },
+          astronaut: { astronautId, name: astronaut.name, mission: astronaut.mission, assignedDoctorId: doctorId },
           doctor: updated,
           allocation,
         },

@@ -26,6 +26,7 @@ router.post("/assign-mission", MissionControlController.assignMission);
 router.get("/crew", RegistrationController.getCrew);
 router.delete("/user/:userId", RegistrationController.deleteUser);
 router.get("/registration", RegistrationController.getRegistrationState);
+router.post("/registration-toggle", RegistrationController.toggleRegistration);
 router.post("/registration/start", RegistrationController.startRegistration);
 router.post("/registration/close", RegistrationController.closeRegistration);
 

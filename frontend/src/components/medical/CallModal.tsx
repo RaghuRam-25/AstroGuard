@@ -10,6 +10,8 @@ export interface CallModalProps {
   peerId: string | null;
   peerName: string;
   callType: "Audio" | "Video";
+  callerId?: string;
+  roomSlug?: string;
   onClose: () => void;
 }
 
@@ -21,7 +23,7 @@ interface Signal {
   candidate?: RTCIceCandidateInit;
 }
 
-export default function CallModal({ open, peerId, peerName, callType, onClose }: CallModalProps) {
+export default function CallModal({ open, peerId, peerName, callType, callerId, roomSlug, onClose }: CallModalProps) {
   // Fresh state per link: the parent remounts this modal (via `key`) for each new call.
   const [mode, setMode] = useState<CallMode>("connecting");
   const [seconds, setSeconds] = useState(0);
@@ -82,13 +84,13 @@ export default function CallModal({ open, peerId, peerName, callType, onClose }:
     const tryInvite = () => {
       if (socketConnectedRef.current && !inviteSentRef.current && peerId) {
         inviteSentRef.current = true;
-        socket.emit("call:invite", { receiverId: peerId, callType, offer: offerRef.current ?? undefined });
+        socket.emit("call:invite", { receiverId: peerId, callerId, callType, roomSlug, offer: offerRef.current ?? undefined });
       }
     };
 
     const preparePeerConnection = () => {
       const pc = new RTCPeerConnection({ iceServers: [{ urls: "stun:stun.l.google.com:19302" }] });
-      pc.onicecandidate = (event) => { if (event.candidate && peerId) socket.emit("call:signal", { receiverId: peerId, signal: { type: "candidate", candidate: event.candidate.toJSON() } }); };
+      pc.onicecandidate = (event) => { if (event.candidate && peerId) socket.emit("call:signal", { receiverId: peerId, callerId, roomSlug, signal: { type: "candidate", candidate: event.candidate.toJSON() } }); };
       pc.ontrack = (event) => {
         if (callType === "Video" && remoteVideoRef.current) remoteVideoRef.current.srcObject = event.streams[0];
         if (callType === "Audio" && remoteAudioRef.current) remoteAudioRef.current.srcObject = event.streams[0];

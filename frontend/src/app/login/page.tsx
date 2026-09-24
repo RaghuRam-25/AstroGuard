@@ -11,10 +11,9 @@ import { Shield } from "lucide-react";
 import RootBackground from "../../components/public/RootBackground";
 
 const ROLE_REDIRECTS: Record<string, string> = {
-  astronaut: "/astronaut/health",
+  astronaut: "/astronaut/dashboard",
   medical_officer: "/medical/dashboard",
   mission_control: "/mission-control/dashboard",
-  admin: "/admin",
 };
 
 export default function LoginPage() {

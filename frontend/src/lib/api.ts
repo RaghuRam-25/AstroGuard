@@ -368,6 +368,13 @@ export const startRegistrationWindow = (durationMinutes: number) =>
 export const closeRegistrationWindow = () =>
   apiRequest<RegistrationStatus>("/api/v1/mission-control/registration/close", { method: "POST" });
 
+/** Mission Control: persist the public registration gate (isOpen + durationMinutes). */
+export const toggleMissionControlRegistration = (isOpen: boolean, durationMinutes: number) =>
+  apiRequest<RegistrationStatus>("/api/v1/mission-control/registration-toggle", {
+    method: "POST",
+    body: JSON.stringify({ isOpen, durationMinutes }),
+  });
+
 /** Mission Control: unified astronauts + medical officers directory. */
 export const getMissionControlCrew = () =>
   apiRequest<{ crew: CrewMember[]; total: number }>("/api/v1/mission-control/crew");

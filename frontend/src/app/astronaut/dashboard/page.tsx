@@ -21,7 +21,6 @@ import {
   Check,
 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
-import { missionInfo } from "@/data/mockData";
 import { getMyRecommendations, markMyRecommendationRead } from "@/lib/api";
 import { useTelemetryStream } from "@/hooks/useTelemetryStream";
 
@@ -418,18 +417,21 @@ export default function AstronautDashboardPage() {
             </span>
             <span className="flex items-center gap-1.5">
               <Clock className="w-3.5 h-3.5 text-cyan-400" />
-              {missionInfo.mission} · Day {missionInfo.missionDay}
+              {user?.missionIds?.[0] ?? "Crew Ops"} · SYNC{" "}
+              {telemetry.lastSyncTimestamp
+                ? new Date(telemetry.lastSyncTimestamp).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
+                : "PENDING"}
             </span>
           </div>
 
           <div className="flex items-center gap-3">
-            <div className="text-right font-mono text-xs">
-              <span className="text-[10px] text-slate-400 block uppercase">Crew Commander</span>
-              <span className="text-cyan-300 font-bold">{user?.name || "Commander Alex Vance"} (AST-001)</span>
-            </div>
-            <div className="h-10 w-10 rounded-xl border border-cyan-500/40 bg-cyan-500/10 flex items-center justify-center text-cyan-300 font-mono font-bold shadow-[0_0_15px_rgba(6,182,212,0.2)]">
-              AV
-            </div>
+<div className="text-right font-mono text-xs">
+                <span className="text-[10px] text-slate-400 block uppercase">Crew Commander</span>
+                <span className="text-cyan-300 font-bold">{user?.name ?? "--"} ({user?.astronautId ?? "--"})</span>
+              </div>
+              <div className="h-10 w-10 rounded-xl border border-cyan-500/40 bg-cyan-500/10 flex items-center justify-center text-cyan-300 font-mono font-bold shadow-[0_0_15px_rgba(6,182,212,0.2)]">
+                {user?.name?.split(" ").map((part) => part[0]).join("").slice(0, 2).toUpperCase() ?? "--"}
+              </div>
           </div>
         </div>
 

@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   AlertCircle,
@@ -286,12 +286,11 @@ export default function AstronautRegisterPage() {
     [form.password]
   );
 
-  useMemo(() => {
+  // Hydrate the gate on first non-loading render.
+  useEffect(() => {
     if (!registrationLoading && !gateReady) {
-      // Hydrate the gate on first non-loading render.
       requestAnimationFrame(() => setGateReady(true));
     }
-    return;
   }, [registrationLoading, gateReady]);
 
   const strengthLabel = ["Weak", "Weak", "Fair", "Good", "Strong"][passedRules];
@@ -747,14 +746,14 @@ export default function AstronautRegisterPage() {
                   <LockKeyhole className="h-8 w-8 text-amber-300" />
                 </div>
                 <h2 className="mt-6 text-2xl font-black tracking-tight text-white">
-                  Registration window is closed
+                  Registration Currently Closed by Mission Control
                 </h2>
                 <p className="mt-3 max-w-sm text-sm leading-6 text-slate-300">
                   Public enrollment is time-limited and only opens when Mission Control broadcasts
-                  a registration window. Check back when the next window opens.
+                  a registration window. This form is disabled until the next window opens.
                 </p>
                 <div className="mt-4 flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.04] px-4 py-2 font-mono text-sm text-slate-400">
-                  <Timer className="h-4 w-4" />00:00:00
+                  <Timer className="h-4 w-4" />NEXT WINDOW PENDING
                 </div>
                 <Link
                   href="/"

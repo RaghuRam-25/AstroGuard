@@ -1,11 +1,12 @@
 import { Request, Response, NextFunction } from "express";
-import { RegistrationWindow } from "../models/RegistrationWindow.js";
+import { SystemSetting } from "../models/SystemSetting.js";
 import { User } from "../models/User.js";
 import { Astronaut } from "../models/Astronaut.js";
 import { successResponse, errorResponse } from "../utils/response.js";
 
 const MIN_DURATION_MINUTES = 1;
 const MAX_DURATION_MINUTES = 1440;
+const GLOBAL_SETTING_ID = "global";
 
 export interface RegistrationStatusPayload {
   isRegistrationOpen: boolean;
@@ -15,30 +16,31 @@ export interface RegistrationStatusPayload {
 }
 
 export class RegistrationController {
-  private static async currentWindow() {
-    const docs = await RegistrationWindow.find().sort({ createdAt: -1 }).limit(1).lean();
-    return docs[0];
+  /** Read the singleton global SystemSetting row (never throws on a miss). */
+  private static async getConfig(): Promise<Record<string, any> | null> {
+    return SystemSetting.findById(GLOBAL_SETTING_ID).lean();
   }
 
-  private static async updateWindow(update: Record<string, unknown>) {
-    const current = await RegistrationController.currentWindow();
-    if (current) {
-      return RegistrationWindow.findByIdAndUpdate(current._id, update, { new: true }).exec();
-    }
-    return RegistrationWindow.create(update);
+  /** Upsert the singleton global row so toggles persist across requests/restarts. */
+  private static async updateConfig(update: Record<string, unknown>) {
+    return SystemSetting.findByIdAndUpdate(
+      GLOBAL_SETTING_ID,
+      { $set: update },
+      { new: true, upsert: true, setDefaultsOnInsert: true }
+    ).exec();
   }
 
   /** Read current state; auto-expires persisted windows whose timestamp has passed. */
   private static async resolve(): Promise<RegistrationStatusPayload> {
-    const doc = await RegistrationController.currentWindow();
+    const doc = await RegistrationController.getConfig();
     if (!doc) {
       return { isRegistrationOpen: false, registrationExpiresAt: null };
     }
     const expiresAt = doc.registrationExpiresAt ? new Date(doc.registrationExpiresAt).getTime() : 0;
     const open = Boolean(doc.isRegistrationOpen) && expiresAt > Date.now();
     if (doc.isRegistrationOpen && !open) {
-      // Expired server-side: reset the persisted window so public reads see a closed gate.
-      await RegistrationWindow.updateOne({ _id: doc._id }, { $set: { isRegistrationOpen: false, registrationExpiresAt: null } }).exec();
+      // Expired server-side: reset the persisted gate so public reads see a closed state.
+      await RegistrationController.updateConfig({ isRegistrationOpen: false, registrationExpiresAt: null });
     }
     return {
       isRegistrationOpen: open,
@@ -98,7 +100,7 @@ export class RegistrationController {
         return errorResponse(res, "durationMinutes must be between 1 and 1440.", 400);
       }
       const expiresAt = new Date(Date.now() + durationMinutes * 60 * 1000);
-      await RegistrationController.updateWindow({
+      await RegistrationController.updateConfig({
           isRegistrationOpen: true,
           registrationExpiresAt: expiresAt,
           durationMinutes,
@@ -127,7 +129,7 @@ export class RegistrationController {
    */
   public static async closeRegistration(req: Request, res: Response, next: NextFunction) {
     try {
-      await RegistrationController.updateWindow({ isRegistrationOpen: false, registrationExpiresAt: null });
+      await RegistrationController.updateConfig({ isRegistrationOpen: false, registrationExpiresAt: null });
       return successResponse(res, { isRegistrationOpen: false, registrationExpiresAt: null }, 200, "Public registration window closed.");
     } catch (error) {
       next(error);
@@ -135,15 +137,21 @@ export class RegistrationController {
   }
 
   /**
-   * POST /api/v1/admin/registration-toggle
-   * Mission governance compatibility endpoint for opening or closing the timed public gate.
-   * Body: { isRegistrationOpen: boolean, durationMinutes?: number }
+   * POST /api/v1/mission-control/registration-toggle
+   * POST /api/v1/admin/registration-toggle (legacy body key)
+   * Persist the public registration gate on the global SystemSetting row.
+   * Body: { isOpen: boolean, durationMinutes?: number } (legacy: { isRegistrationOpen, durationMinutes })
+   * When isOpen === true, registrationExpiresAt = now() + durationMinutes (default 15).
    */
   public static async toggleRegistration(req: Request, res: Response, next: NextFunction) {
     try {
-      const isRegistrationOpen = Boolean(req.body?.isRegistrationOpen);
-      if (!isRegistrationOpen) {
-        await RegistrationController.updateWindow({ isRegistrationOpen: false, registrationExpiresAt: null });
+      const requestedOpen =
+        req.body?.isOpen !== undefined
+          ? Boolean(req.body.isOpen)
+          : Boolean(req.body?.isRegistrationOpen);
+
+      if (!requestedOpen) {
+        await RegistrationController.updateConfig({ isRegistrationOpen: false, registrationExpiresAt: null, durationMinutes: null });
         return successResponse(res, { isRegistrationOpen: false, registrationExpiresAt: null }, 200, "Public registration window closed.");
       }
 
@@ -153,7 +161,7 @@ export class RegistrationController {
       }
 
       const expiresAt = new Date(Date.now() + durationMinutes * 60 * 1000);
-      await RegistrationController.updateWindow({
+      await RegistrationController.updateConfig({
           isRegistrationOpen: true,
           registrationExpiresAt: expiresAt,
           durationMinutes,
@@ -187,10 +195,24 @@ export class RegistrationController {
         .select("name email role astronautId assignedAstronautIds missionIds isActive createdAt")
         .sort({ name: 1 })
         .lean();
-      const astronautDocs = await Astronaut.find().select("astronautId status mission online").lean();
+      const astronautDocs = await Astronaut.find().select("astronautId status mission online assignedDoctorId").lean();
       const astroStatus = new Map(astronautDocs.map((a: any) => [a.astronautId, a]));
+      const doctorNames = new Map(
+        users.filter((u: any) => u.role === "medical_officer").map((d: any) => [String(d._id), d.name])
+      );
+      const astrosByDoctor = new Map<string, string[]>();
+      astronautDocs.forEach((a: any) => {
+        if (a.assignedDoctorId) {
+          const key = String(a.assignedDoctorId);
+          astrosByDoctor.set(key, [...(astrosByDoctor.get(key) || []), a.astronautId]);
+        }
+      });
       const crew = users.map((u: any) => {
         const profile = u.astronautId ? astroStatus.get(u.astronautId) : undefined;
+        const doctorCaseload = astrosByDoctor.get(String(u._id)) || [];
+        const caseload = [...new Set([...(u.assignedAstronautIds || []), ...doctorCaseload])];
+        const assignedDoctorId =
+          u.role === "astronaut" && profile?.assignedDoctorId ? String(profile.assignedDoctorId) : null;
         return {
           userId: u._id.toString(),
           crewId: u.astronautId || `MC-${String(u._id).slice(-4).toUpperCase()}`,
@@ -201,9 +223,14 @@ export class RegistrationController {
           assigned:
             u.role === "astronaut"
               ? (profile as any)?.mission || u.missionIds?.[0] || "Unassigned"
-              : u.assignedAstronautIds?.length
-              ? `${u.assignedAstronautIds.length} astronaut(s)`
+              : caseload.length
+              ? `${caseload.length} astronaut(s)`
               : "No caseload",
+          assignedDoctorId,
+          assignedDoctor:
+            assignedDoctorId && doctorNames.has(assignedDoctorId)
+              ? { userId: assignedDoctorId, name: doctorNames.get(assignedDoctorId) }
+              : null,
           accountStatus: u.isActive === false ? "Banned" : "Active",
           online: Boolean((profile as any)?.online),
           status: (profile as any)?.status || (u.isActive === false ? "Revoked" : "Registered"),
