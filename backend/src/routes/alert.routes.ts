@@ -12,4 +12,5 @@ router.post("/emergency", requireRole("astronaut"), AlertController.createEmerge
 router.get("/", requireRole("medical_officer", "mission_control"), validateRequest(getAlertsSchema), AlertController.getAlerts);
 router.get("/:astronautId", requireRole("medical_officer", "mission_control"), validateRequest(getAstronautAlertsSchema), checkAstronautAccess("astronautId"), AlertController.getAstronautAlerts);
 router.post("/:id/resolve", requireRole("medical_officer", "mission_control"), validateRequest(resolveAlertSchema), AlertController.resolveAlert);
+router.patch("/:id/resolve", requireRole("medical_officer", "mission_control"), validateRequest(resolveAlertSchema), AlertController.resolveAlert);
 export default router;

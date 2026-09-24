@@ -5,6 +5,52 @@ export const API_BASE_URL =
   configuredApiUrl || (process.env.NODE_ENV === "development" ? "http://localhost:5000" : "");
 
 // ─────────────────────────────────────────────────────────
+//  Token storage helpers (supports cross-site Vercel to Render auth)
+// ─────────────────────────────────────────────────────────
+const ACCESS_TOKEN_KEY = "astroguard_access_token";
+const REFRESH_TOKEN_KEY = "astroguard_refresh_token";
+
+export function getStoredAccessToken(): string | null {
+  if (typeof window === "undefined") return null;
+  try {
+    return localStorage.getItem(ACCESS_TOKEN_KEY) || sessionStorage.getItem(ACCESS_TOKEN_KEY);
+  } catch {
+    return null;
+  }
+}
+
+export function getStoredRefreshToken(): string | null {
+  if (typeof window === "undefined") return null;
+  try {
+    return localStorage.getItem(REFRESH_TOKEN_KEY) || sessionStorage.getItem(REFRESH_TOKEN_KEY);
+  } catch {
+    return null;
+  }
+}
+
+export function setStoredTokens(accessToken?: string, refreshToken?: string) {
+  if (typeof window === "undefined") return;
+  try {
+    if (accessToken) {
+      localStorage.setItem(ACCESS_TOKEN_KEY, accessToken);
+    }
+    if (refreshToken) {
+      localStorage.setItem(REFRESH_TOKEN_KEY, refreshToken);
+    }
+  } catch {}
+}
+
+export function clearStoredTokens() {
+  if (typeof window === "undefined") return;
+  try {
+    localStorage.removeItem(ACCESS_TOKEN_KEY);
+    localStorage.removeItem(REFRESH_TOKEN_KEY);
+    sessionStorage.removeItem(ACCESS_TOKEN_KEY);
+    sessionStorage.removeItem(REFRESH_TOKEN_KEY);
+  } catch {}
+}
+
+// ─────────────────────────────────────────────────────────
 //  Token refresh coordination
 //
 //  Multiple components fire protected requests at the same
@@ -27,9 +73,22 @@ export async function refreshAccessToken(): Promise<boolean> {
   }
 
   refreshInFlight = (async () => {
-    const res = await apiRequest("/api/auth/refresh", { method: "POST" }, false);
-    const ok = res.success;
-    if (!ok) {
+    const storedRefresh = getStoredRefreshToken();
+    const res = await apiRequest<{ user?: unknown; accessToken?: string; refreshToken?: string }>(
+      "/api/auth/refresh",
+      {
+        method: "POST",
+        body: JSON.stringify({ refreshToken: storedRefresh }),
+        headers: storedRefresh ? { "x-refresh-token": storedRefresh } : {},
+      },
+      false
+    );
+
+    const ok = res.success && Boolean(res.data?.accessToken);
+    if (ok && res.data?.accessToken) {
+      setStoredTokens(res.data.accessToken, res.data.refreshToken);
+      lastRefreshFailedAt = 0;
+    } else {
       lastRefreshFailedAt = Date.now();
     }
     return ok;
@@ -75,8 +134,12 @@ export async function apiRequest<T = unknown>(
 
   const url = endpoint.startsWith("http") ? endpoint : `${API_BASE_URL}${endpoint}`;
 
+  const token = getStoredAccessToken();
+  const authHeader: Record<string, string> = token ? { Authorization: `Bearer ${token}` } : {};
+
   const headers: HeadersInit = {
     "Content-Type": "application/json",
+    ...authHeader,
     ...options.headers,
   };
 
@@ -135,13 +198,19 @@ export async function apiRequest<T = unknown>(
 //  Auth
 // ─────────────────────────────────────────────────────────
 
-export const login = (loginId: string, password: string) =>
-  apiRequest("/api/auth/login", {
+export const login = async (loginId: string, password: string) => {
+  const res = await apiRequest<{ user: unknown; accessToken?: string; refreshToken?: string }>("/api/auth/login", {
     method: "POST",
     body: JSON.stringify({ email: loginId, password }),
   });
+  if (res.success && res.data?.accessToken) {
+    setStoredTokens(res.data.accessToken, res.data.refreshToken);
+    resetRefreshGate();
+  }
+  return res;
+};
 
-export const registerAstronaut = (data: {
+export const registerAstronaut = async (data: {
   name: string;
   email: string;
   username: string;
@@ -155,20 +224,29 @@ export const registerAstronaut = (data: {
   nasaBadgeId?: string;
   profileImage?: string;
   agreeToTerms: boolean;
-}) =>
-  apiRequest("/api/auth/register", {
+}) => {
+  const res = await apiRequest<{ user: unknown; accessToken?: string; refreshToken?: string }>("/api/auth/register", {
     method: "POST",
     body: JSON.stringify(data),
   });
+  if (res.success && res.data?.accessToken) {
+    setStoredTokens(res.data.accessToken, res.data.refreshToken);
+    resetRefreshGate();
+  }
+  return res;
+};
 
-export const logout = () =>
-  apiRequest("/api/auth/logout", { method: "POST" });
+export const logout = async () => {
+  clearStoredTokens();
+  resetRefreshGate();
+  return apiRequest("/api/auth/logout", { method: "POST" });
+};
 
 export const getCurrentUser = () =>
   apiRequest("/api/auth/me");
 
 export const refreshToken = () =>
-  apiRequest("/api/auth/refresh", { method: "POST" });
+  refreshAccessToken();
 
 // ─────────────────────────────────────────────────────────
 //  Astronaut — Personal (own data only)

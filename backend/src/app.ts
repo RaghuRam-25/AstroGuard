@@ -32,29 +32,48 @@ const app: Application = express();
 app.use(helmet());
 app.use(cookieParser());
 
-// CORS configuration (supports configured frontend URL + local Next.js dev)
-const configuredFrontendOrigins = env.FRONTEND_URL.split(",")
-  .map((origin) => origin.trim())
+// CORS configuration (supports configured frontend URL + local Next.js dev + Vercel deployments)
+const configuredFrontendOrigins = (env.FRONTEND_URL || "")
+  .split(",")
+  .map((origin) => origin.trim().replace(/\/+$/, ""))
   .filter(Boolean);
 
-const allowedOrigins = [
+const defaultAllowedOrigins = [
   ...configuredFrontendOrigins,
+  "https://astro-guard-liart.vercel.app",
   "http://localhost:3000",
   "http://localhost:3001",
   "http://127.0.0.1:3000",
+  "http://127.0.0.1:3001",
 ];
 
 app.use(
   cors({
     origin: (origin, callback) => {
-      if (!origin || allowedOrigins.includes(origin)) {
+      if (!origin) {
         return callback(null, true);
       }
-      return callback(new Error(`CORS blocked origin: ${origin}`));
+      const cleanOrigin = origin.trim().replace(/\/+$/, "");
+      if (
+        defaultAllowedOrigins.includes(cleanOrigin) ||
+        cleanOrigin.endsWith(".vercel.app")
+      ) {
+        return callback(null, true);
+      }
+      return callback(null, false);
     },
     credentials: true,
     methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-    allowedHeaders: ["Content-Type", "Authorization", "Cookie"],
+    allowedHeaders: [
+      "Content-Type",
+      "Authorization",
+      "Cookie",
+      "x-refresh-token",
+      "x-request-id",
+      "Accept",
+      "Accept-Language",
+    ],
+    exposedHeaders: ["set-cookie"],
   })
 );
 

@@ -1,3 +1,4 @@
+import mongoose from "mongoose";
 import { Alert, IAlert } from "../models/Alert.js";
 
 export interface CreateAlertParams {
@@ -34,6 +35,7 @@ export class AlertService {
     severity?: string;
     resolved?: boolean;
     limit?: number;
+    astronautIds?: string[];
   }): Promise<IAlert[]> {
     const query: any = {};
 
@@ -43,6 +45,10 @@ export class AlertService {
 
     if (typeof filter.resolved === "boolean") {
       query.resolved = filter.resolved;
+    }
+
+    if (filter.astronautIds && filter.astronautIds.length) {
+      query.astronautId = { $in: filter.astronautIds };
     }
 
     const limit = filter.limit || 50;
@@ -60,13 +66,15 @@ export class AlertService {
    * Mark an alert as resolved
    */
   public static async resolveAlert(id: string): Promise<IAlert | null> {
-    return await Alert.findByIdAndUpdate(
-      id,
-      {
-        resolved: true,
-        resolvedAt: new Date(),
-      },
-      { new: true }
-    );
+    const update = {
+      resolved: true,
+      resolvedAt: new Date(),
+    };
+
+    if (mongoose.isValidObjectId(id)) {
+      return await Alert.findByIdAndUpdate(id, update, { new: true });
+    }
+
+    return await Alert.findOneAndUpdate({ _id: id }, update, { new: true });
   }
 }

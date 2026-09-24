@@ -1,77 +1,113 @@
 "use client";
 
-import { useState } from "react";
-import { Heart, Moon, Droplet, Activity, ShieldCheck, LucideIcon } from "lucide-react";
+import { useEffect, useState, useCallback, useMemo } from "react";
+import { Heart, Moon, Droplet, Activity, ShieldCheck, Siren, LucideIcon, RefreshCw } from "lucide-react";
 import ProtectedRoute from "../../components/auth/ProtectedRoute";
 import RoleGuard from "../../components/auth/RoleGuard";
+import { getAlerts } from "../../lib/api";
 
 interface AlertItem {
-  id: number;
+  id: string | number;
   title: string;
   description: string;
   severity: "Normal" | "Watch" | "Warning" | "Critical";
   time: string;
   icon: LucideIcon;
   iconColor: string;
+  resolved?: boolean;
+}
+
+function timeAgo(value?: string): string {
+  if (!value) return "Just now";
+  const seconds = Math.max(0, Math.floor((Date.now() - new Date(value).getTime()) / 1000));
+  if (seconds < 60) return "Just now";
+  const minutes = Math.floor(seconds / 60);
+  if (minutes < 60) return `${minutes} minutes ago`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours} hours ago`;
+  const days = Math.floor(hours / 24);
+  return `${days} days ago`;
+}
+
+function getIconForAlert(title: string, signal?: string): { icon: LucideIcon; iconColor: string } {
+  const text = `${title} ${signal || ""}`.toLowerCase();
+  if (text.includes("sos") || text.includes("emergency")) {
+    return { icon: Siren, iconColor: "text-rose-400 bg-rose-500/10" };
+  }
+  if (text.includes("heart") || text.includes("cardiac") || text.includes("pulse")) {
+    return { icon: Heart, iconColor: "text-red-400 bg-red-500/10" };
+  }
+  if (text.includes("sleep") || text.includes("fatigue") || text.includes("circadian")) {
+    return { icon: Moon, iconColor: "text-purple-400 bg-purple-500/10" };
+  }
+  if (text.includes("spo2") || text.includes("oxygen") || text.includes("blood") || text.includes("hydration")) {
+    return { icon: Droplet, iconColor: "text-cyan-400 bg-cyan-500/10" };
+  }
+  if (text.includes("activity") || text.includes("stress") || text.includes("motion")) {
+    return { icon: Activity, iconColor: "text-emerald-400 bg-emerald-500/10" };
+  }
+  return { icon: ShieldCheck, iconColor: "text-emerald-400 bg-emerald-500/10" };
 }
 
 export default function AlertsPage() {
   const [activeFilter, setActiveFilter] = useState("All");
+  const [alerts, setAlerts] = useState<AlertItem[]>([]);
+  const [loading, setLoading] = useState(true);
 
   const filterOptions = ["All", "Normal", "Watch", "Warning", "Critical"];
 
-  const alertList: AlertItem[] = [
-    {
-      id: 1,
-      title: "Elevated Heart Rate",
-      description: "Heart rate is 12% higher than your baseline.",
-      severity: "Watch",
-      time: "12 minutes ago",
-      icon: Heart,
-      iconColor: "text-red-400 bg-red-500/10",
-    },
-    {
-      id: 2,
-      title: "Low Sleep Duration",
-      description: "Sleep duration is below your usual range.",
-      severity: "Warning",
-      time: "2 hours ago",
-      icon: Moon,
-      iconColor: "text-purple-400 bg-purple-500/10",
-    },
-    {
-      id: 3,
-      title: "SpO₂ Slightly Low",
-      description: "Blood oxygen level is 2% below normal.",
-      severity: "Watch",
-      time: "4 hours ago",
-      icon: Droplet,
-      iconColor: "text-cyan-400 bg-cyan-500/10",
-    },
-    {
-      id: 4,
-      title: "Activity Level High",
-      description: "Activity level is higher than usual.",
-      severity: "Watch",
-      time: "6 hours ago",
-      icon: Activity,
-      iconColor: "text-emerald-400 bg-emerald-500/10",
-    },
-    {
-      id: 5,
-      title: "All Metrics Normal",
-      description: "All vital signs are within expected range.",
-      severity: "Normal",
-      time: "8 hours ago",
-      icon: ShieldCheck,
-      iconColor: "text-emerald-400 bg-emerald-500/10",
-    },
-  ];
+  const fetchLiveAlerts = useCallback(async () => {
+    try {
+      const res = await getAlerts();
+      if (res.success && Array.isArray(res.data)) {
+        const rawAlerts = res.data as Array<{
+          _id?: string;
+          id?: string | number;
+          title?: string;
+          description?: string;
+          severity?: "Normal" | "Watch" | "Warning" | "Critical";
+          signal?: string;
+          createdAt?: string;
+          resolved?: boolean;
+        }>;
 
-  const filteredAlerts = alertList.filter((a) => {
-    if (activeFilter === "All") return true;
-    return a.severity.toLowerCase() === activeFilter.toLowerCase();
-  });
+        const mapped: AlertItem[] = rawAlerts.map((a, index) => {
+          const title = a.title || "Health Alert";
+          const severity = a.severity || "Normal";
+          const { icon, iconColor } = getIconForAlert(title, a.signal);
+          return {
+            id: a._id || a.id || index + 1,
+            title,
+            description: a.description || "Alert telemetry logged.",
+            severity,
+            time: timeAgo(a.createdAt),
+            icon,
+            iconColor,
+            resolved: a.resolved,
+          };
+        });
+
+        setAlerts(mapped);
+      }
+    } catch {
+      // Fallback retained
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    void fetchLiveAlerts();
+    const timer = setInterval(() => {
+      void fetchLiveAlerts();
+    }, 5000);
+    return () => clearInterval(timer);
+  }, [fetchLiveAlerts]);
+
+  const filteredAlerts = useMemo(() => {
+    if (activeFilter === "All") return alerts;
+    return alerts.filter((a) => a.severity.toLowerCase() === activeFilter.toLowerCase());
+  }, [alerts, activeFilter]);
 
   const getSeverityBadgeStyle = (severity: string) => {
     switch (severity) {
@@ -126,7 +162,11 @@ export default function AlertsPage() {
 
       {/* Alert Cards Stack */}
       <div className="space-y-3.5">
-        {filteredAlerts.length > 0 ? (
+        {loading && alerts.length === 0 ? (
+          <div className="rounded-2xl border border-white/10 bg-[#07111f]/80 p-8 text-center text-slate-400">
+            <p className="text-xs text-slate-400">Loading alerts stream…</p>
+          </div>
+        ) : filteredAlerts.length > 0 ? (
           filteredAlerts.map((alert) => {
             const Icon = alert.icon;
             return (

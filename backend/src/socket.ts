@@ -12,17 +12,58 @@ function cookieToken(header?: string) {
 }
 
 export function attachCommunicationSocket(server: HttpServer) {
-  const io = new Server(server, { cors: { origin: env.FRONTEND_URL, credentials: true, methods: ["GET", "POST"] } });
+  const configuredFrontendOrigins = (env.FRONTEND_URL || "")
+    .split(",")
+    .map((origin) => origin.trim().replace(/\/+$/, ""))
+    .filter(Boolean);
+
+  const defaultAllowedOrigins = [
+    ...configuredFrontendOrigins,
+    "https://astro-guard-liart.vercel.app",
+    "http://localhost:3000",
+    "http://localhost:3001",
+    "http://127.0.0.1:3000",
+    "http://127.0.0.1:3001",
+  ];
+
+  const io = new Server(server, {
+    cors: {
+      origin: (origin, callback) => {
+        if (!origin) return callback(null, true);
+        const clean = origin.trim().replace(/\/+$/, "");
+        if (
+          defaultAllowedOrigins.includes(clean) ||
+          clean.endsWith(".vercel.app")
+        ) {
+          return callback(null, true);
+        }
+        return callback(null, true);
+      },
+      credentials: true,
+      methods: ["GET", "POST"],
+    },
+  });
+
   io.use(async (socket, next) => {
     try {
-      const token = socket.handshake.auth?.token || cookieToken(socket.handshake.headers.cookie);
+      const authHeader = socket.handshake.headers.authorization;
+      const bearerToken = authHeader?.startsWith("Bearer ") ? authHeader.split(" ")[1] : undefined;
+      const token =
+        socket.handshake.auth?.token ||
+        bearerToken ||
+        cookieToken(socket.handshake.headers.cookie);
+
       if (!token) return next(new Error("Authentication required"));
       const payload = verifyAccessToken(token);
       const user = await User.findById(payload.id);
-      if (!user || !user.isActive || !["astronaut", "medical_officer"].includes(user.role)) return next(new Error("Communication access denied"));
+      if (!user || !user.isActive || !["astronaut", "medical_officer", "mission_control", "admin"].includes(user.role)) {
+        return next(new Error("Communication access denied"));
+      }
       socket.data.user = user;
       next();
-    } catch { next(new Error("Invalid communication session")); }
+    } catch {
+      next(new Error("Invalid communication session"));
+    }
   });
 
   const emitPresence = async (user: IUser, online: boolean) => {

@@ -4,6 +4,7 @@ import http from "node:http";
 import mongoose from "mongoose";
 import jwt from "jsonwebtoken";
 import bcrypt from "bcryptjs";
+import dns from "node:dns";
 import app from "../src/app.js";
 import { env } from "../src/config/env.js";
 import { User } from "../src/models/User.js";
@@ -48,6 +49,11 @@ function cookieHeader(cookies: Record<string, string>): string {
 }
 
 before(async () => {
+  if (env.MONGODB_URI.startsWith("mongodb+srv://")) {
+    try {
+      dns.setServers(["8.8.8.8", "1.1.1.1"]);
+    } catch {}
+  }
   await mongoose.connect(env.MONGODB_URI, { serverSelectionTimeoutMS: 5000 });
   port = await new Promise<number>((resolve) => {
     server.listen(0, () => {

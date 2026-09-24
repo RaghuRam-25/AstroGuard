@@ -131,7 +131,7 @@ export class AuthController {
 
       return successResponse(
         res,
-        { user: formatUserResponse(user), accessToken },
+        { user: formatUserResponse(user), accessToken, refreshToken },
         201,
         "Registration successful"
       );
@@ -181,7 +181,7 @@ export class AuthController {
 
       return successResponse(
         res,
-        { user: formatUserResponse(user), accessToken },
+        { user: formatUserResponse(user), accessToken, refreshToken },
         200,
         "Login successful"
       );
@@ -216,14 +216,18 @@ export class AuthController {
 
   /**
    * POST /api/auth/refresh
-   * Refresh access token using refresh token cookie
+   * Refresh access token using refresh token in body, header, or cookie
    */
   public static async refreshToken(req: Request, res: Response, next: NextFunction) {
     try {
-      const refreshToken = req.cookies?.astro_refresh;
+      const refreshToken =
+        req.body?.refreshToken ||
+        (req.headers["x-refresh-token"] as string) ||
+        req.cookies?.astro_refresh;
+
       if (!refreshToken) {
         console.warn(
-          `[auth.refresh] refresh cookie missing -> 401 | ${req.method} ${req.path} | hasAccessCookie=${Boolean(req.cookies?.astro_token)}`
+          `[auth.refresh] refresh token missing -> 401 | ${req.method} ${req.path} | hasAccessCookie=${Boolean(req.cookies?.astro_token)}`
         );
         return errorResponse(res, "Refresh token missing.", 401);
       }
@@ -252,7 +256,7 @@ export class AuthController {
 
       return successResponse(
         res,
-        { user: formatUserResponse(user), accessToken: newAccessToken },
+        { user: formatUserResponse(user), accessToken: newAccessToken, refreshToken: newRefreshToken },
         200,
         "Token refreshed successfully"
       );

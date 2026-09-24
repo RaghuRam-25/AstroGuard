@@ -2,7 +2,13 @@
 
 import React, { createContext, useContext, useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
-import { apiRequest, refreshAccessToken, resetRefreshGate } from "../lib/api";
+import {
+  apiRequest,
+  refreshAccessToken,
+  resetRefreshGate,
+  login as apiLogin,
+  logout as apiLogout,
+} from "../lib/api";
 
 export type UserRole = "astronaut" | "medical_officer" | "mission_control" | "admin";
 
@@ -79,15 +85,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const login = async (loginId: string, password: string): Promise<LoginResult> => {
     setError(null);
     try {
-      const res = await apiRequest<{ user: AuthUser }>("/api/auth/login", {
-        method: "POST",
-        body: JSON.stringify({ email: loginId, password }),
-      });
+      const res = await apiLogin(loginId, password);
 
-      if (res.success && res.data?.user) {
-        resetRefreshGate();
-        setUser(res.data.user);
-        return { success: true, user: res.data.user };
+      if (res.success && res.data && (res.data as any).user) {
+        const authUser = (res.data as any).user as AuthUser;
+        setUser(authUser);
+        return { success: true, user: authUser };
       } else {
         const msg = res.message || "Invalid credentials.";
         setError(msg);
@@ -102,11 +105,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const logout = async () => {
     try {
-      await apiRequest("/api/auth/logout", { method: "POST" });
+      await apiLogout();
     } catch (err) {
       console.error("Logout error:", err);
     } finally {
-      resetRefreshGate();
       setUser(null);
       router.replace("/");
     }
