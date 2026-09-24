@@ -400,7 +400,7 @@ export const quickActions = [
   { label: "Enter Health Data", href: "/astronaut/data-input" },
   { label: "View AI Analysis", href: "/astronaut/ai-analysis" },
   { label: "Scan RFID Meal Pack", href: "/astronaut/dashboard" },
-  { label: "View Health History", href: "/astronaut/health" },
+  { label: "View Health History", href: "/astronaut/dashboard" },
 ];
 
 export const healthLogs = [

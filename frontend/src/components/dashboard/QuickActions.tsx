@@ -5,7 +5,7 @@ import { Card } from "@/components/shared/Card";
 const ACTIONS = [
   { label: "Scan RFID Meal Pack", href: "/astronaut/dashboard", icon: ScanLine },
   { label: "View AI Analysis", href: "/astronaut/ai-analysis", icon: Brain },
-  { label: "View Health History", href: "/astronaut/health", icon: History },
+  { label: "View Health History", href: "/astronaut/dashboard", icon: History },
   { label: "Enter Health Data", href: "/astronaut/data-input", icon: History },
 ];
 

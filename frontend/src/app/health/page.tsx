@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
 
 export default function HealthPage() {
-  redirect("/astronaut/health");
+  redirect("/astronaut/dashboard");
 }

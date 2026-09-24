@@ -3,6 +3,7 @@ import { TelemetryService, telemetryEvents } from "../services/telemetry.service
 import { Astronaut } from "../models/Astronaut.js";
 import { canDoctorManageAstronaut } from "../services/medicalAccess.service.js";
 import { successResponse, errorResponse } from "../utils/response.js";
+import { env } from "../config/env.js";
 
 export class TelemetryController {
   private static async canReadTelemetry(req: Request, astronautId: string) {
@@ -89,11 +90,21 @@ export class TelemetryController {
     }
 
     // Set SSE Headers
+    const requestOrigin = req.get("origin");
+    const allowedOrigins = [
+      ...env.FRONTEND_URL.split(",").map((origin) => origin.trim()).filter(Boolean),
+      "http://localhost:3000",
+      "http://localhost:3001",
+      "http://127.0.0.1:3000",
+    ];
+    const allowOrigin = requestOrigin && allowedOrigins.includes(requestOrigin) ? requestOrigin : "*";
+
     res.writeHead(200, {
       "Content-Type": "text/event-stream",
       "Cache-Control": "no-cache",
       Connection: "keep-alive",
-      "Access-Control-Allow-Origin": "*",
+      "Access-Control-Allow-Origin": allowOrigin,
+      "Access-Control-Allow-Credentials": "true",
     });
 
     // Send initial ping/connection confirmation

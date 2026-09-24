@@ -10,7 +10,6 @@ import { useAuth } from "@/context/AuthContext";
 interface TopbarProps { onMenuClick: () => void; }
 const PAGE_HEADINGS: Record<string, { title: string; subtitle: string }> = {
   "/astronaut/dashboard": { title: "Health Dashboard HUD", subtitle: "Autonomous bio-telemetry streaming and RFID nutrition tracking." },
-  "/astronaut/health": { title: "My Health", subtitle: "Your personal biometric telemetry and wellness history." },
   "/astronaut/data-input": { title: "Automated Telemetry & RFID Hub", subtitle: "Zero manual entry biometric and nutrition sync." },
   "/astronaut/ai-analysis": { title: "AI Analysis", subtitle: "Explainable anomaly detection and insights." },
   "/astronaut/medical-consult": { title: "Medical Consult", subtitle: "Chat & call with medical officers and flight surgeons." },

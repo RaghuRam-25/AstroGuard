@@ -6,7 +6,7 @@ import { useAuth } from "../../context/AuthContext";
 import { Lock, IdCard, Loader2, AlertCircle, Sparkles, ShieldCheck } from "lucide-react";
 
 const ROLE_REDIRECTS: Record<string, string> = {
-  astronaut: "/astronaut/health",
+  astronaut: "/astronaut/dashboard",
   medical_officer: "/medical/dashboard",
   mission_control: "/mission-control/dashboard",
   admin: "/admin",

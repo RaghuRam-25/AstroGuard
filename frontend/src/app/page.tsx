@@ -8,7 +8,7 @@ import PublicShell from "../components/public/PublicShell";
 import SpaceLaunchOverlay from "../components/SpaceLaunchOverlay";
 
 const ROLE_REDIRECTS: Record<string, string> = {
-  astronaut: "/astronaut/health",
+  astronaut: "/astronaut/dashboard",
   medical_officer: "/medical/dashboard",
   mission_control: "/mission-control/dashboard",
   admin: "/admin",
