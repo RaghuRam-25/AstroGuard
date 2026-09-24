@@ -58,7 +58,7 @@ export default function CrewDirectory() {
   useEffect(() => {
     getMissionControlCrew()
       .then((res) => {
-        if (res.success) {
+        if (res.success && res.data) {
           setCrew(res.data.crew);
           setLive(true);
         } else {

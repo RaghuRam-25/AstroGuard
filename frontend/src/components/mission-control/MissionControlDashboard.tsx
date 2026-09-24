@@ -418,24 +418,30 @@ export default function MissionControlDashboard() {
             <Users className="h-3.5 w-3.5 text-cyan-300" /> Astronaut Roster
           </p>
           <div className="mt-2.5 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-            {astronauts.map((astronaut) => (
-              <AstronautCard
-                key={astronaut.id}
-                astronaut={astronaut}
-                doctors={doctors}
-                missions={missions}
-                doctorDraft={doctorDrafts[astronaut.id] ?? astronaut.assignedDoctorId ?? ""}
-                missionDraft={missionDrafts[astronaut.id] ?? astronaut.assignedMissionId ?? ""}
-                onDoctorDraftChange={(value) =>
-                  setDoctorDrafts((current) => ({ ...current, [astronaut.id]: value }))
-                }
-                onMissionDraftChange={(value) =>
-                  setMissionDrafts((current) => ({ ...current, [astronaut.id]: value }))
-                }
-                onSaveDoctor={() => saveDoctorAssignment(astronaut)}
-                onSaveMission={() => saveMissionAssignment(astronaut)}
-              />
-            ))}
+            {astronauts.length === 0 ? (
+              <p className="flex items-center justify-center gap-2 rounded-xl border border-white/5 bg-black/20 px-4 py-8 text-center text-xs text-slate-500 sm:col-span-2 lg:col-span-3">
+                <Users className="h-4 w-4 text-cyan-300" /> No registered astronauts yet — sign-ups appear here as they are approved.
+              </p>
+            ) : (
+              astronauts.map((astronaut) => (
+                <AstronautCard
+                  key={astronaut.id}
+                  astronaut={astronaut}
+                  doctors={doctors}
+                  missions={missions}
+                  doctorDraft={doctorDrafts[astronaut.id] ?? astronaut.assignedDoctorId ?? ""}
+                  missionDraft={missionDrafts[astronaut.id] ?? astronaut.assignedMissionId ?? ""}
+                  onDoctorDraftChange={(value) =>
+                    setDoctorDrafts((current) => ({ ...current, [astronaut.id]: value }))
+                  }
+                  onMissionDraftChange={(value) =>
+                    setMissionDrafts((current) => ({ ...current, [astronaut.id]: value }))
+                  }
+                  onSaveDoctor={() => saveDoctorAssignment(astronaut)}
+                  onSaveMission={() => saveMissionAssignment(astronaut)}
+                />
+              ))
+            )}
           </div>
         </div>
       </section>
@@ -456,14 +462,20 @@ export default function MissionControlDashboard() {
           </span>
         </div>
         <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-          {doctors.map((doctor) => (
-            <DoctorCard
-              key={doctor.id}
-              doctor={doctor}
-              assignedAstronauts={astronauts.filter((a) => a.assignedDoctorId === doctor.id)}
-              handledAlerts={alerts.filter((a) => a.assignedDoctorId === doctor.id)}
-            />
-          ))}
+          {doctors.length === 0 ? (
+            <p className="flex items-center justify-center gap-2 rounded-xl border border-white/5 bg-black/20 px-4 py-8 text-center text-xs text-slate-500 sm:col-span-2 xl:col-span-3">
+              <Stethoscope className="h-4 w-4 text-emerald-300" /> No medical officers on duty yet — registered doctors appear here.
+            </p>
+          ) : (
+            doctors.map((doctor) => (
+              <DoctorCard
+                key={doctor.id}
+                doctor={doctor}
+                assignedAstronauts={astronauts.filter((a) => a.assignedDoctorId === doctor.id)}
+                handledAlerts={alerts.filter((a) => a.assignedDoctorId === doctor.id)}
+              />
+            ))
+          )}
         </div>
       </section>
 

@@ -48,8 +48,17 @@ export class RegistrationController {
     };
   }
 
+  /** Fail-closed read: DB hiccups must never turn a closed gate into an open sign-up. */
+  private static async safeResolve(): Promise<RegistrationStatusPayload> {
+    try {
+      return await RegistrationController.resolve();
+    } catch {
+      return { isRegistrationOpen: false, registrationExpiresAt: null };
+    }
+  }
+
   public static async isRegistrationOpen(): Promise<boolean> {
-    const state = await RegistrationController.resolve();
+    const state = await RegistrationController.safeResolve();
     return state.isRegistrationOpen;
   }
 
@@ -59,7 +68,7 @@ export class RegistrationController {
    */
   public static async getStatus(req: Request, res: Response, next: NextFunction) {
     try {
-      return successResponse(res, await RegistrationController.resolve(), 200);
+      return successResponse(res, await RegistrationController.safeResolve(), 200);
     } catch (error) {
       next(error);
     }
@@ -71,7 +80,7 @@ export class RegistrationController {
    */
   public static async getRegistrationState(req: Request, res: Response, next: NextFunction) {
     try {
-      return successResponse(res, await RegistrationController.resolve(), 200);
+      return successResponse(res, await RegistrationController.safeResolve(), 200);
     } catch (error) {
       next(error);
     }

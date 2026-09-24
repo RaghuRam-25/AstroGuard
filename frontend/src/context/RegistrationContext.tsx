@@ -126,7 +126,7 @@ export function RegistrationProvider({ children }: { children: React.ReactNode }
     } finally {
       setLoading(false);
     }
-  }, [persist]);
+  }, []);
 
   const startRegistration = useCallback(
     async (durationMinutes: number) => {
@@ -184,6 +184,25 @@ export function RegistrationProvider({ children }: { children: React.ReactNode }
     });
     return () => window.cancelAnimationFrame(frame);
   }, [refresh, persist]);
+
+  // Server resync: poll the DB-backed endpoint so an already-open Register page /
+  // Navbar unlocks the moment Mission Control opens a window in another client.
+  useEffect(() => {
+    const pollId = window.setInterval(() => {
+      void refresh();
+    }, 15000);
+    const onVisibility = () => {
+      if (document.visibilityState === "visible") void refresh();
+    };
+    const onFocus = () => void refresh();
+    document.addEventListener("visibilitychange", onVisibility);
+    window.addEventListener("focus", onFocus);
+    return () => {
+      window.clearInterval(pollId);
+      document.removeEventListener("visibilitychange", onVisibility);
+      window.removeEventListener("focus", onFocus);
+    };
+  }, [refresh]);
 
   // Subscribe to cross-tab broadcasts (real-time sync across windows).
   useEffect(() => {

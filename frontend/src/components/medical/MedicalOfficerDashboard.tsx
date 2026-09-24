@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Activity, CheckCircle2, ShieldAlert, ShieldCheck, Stethoscope, UserCheck, Waves } from "lucide-react";
 import { getAstronautAlerts, getMedicalCommunicationPeers, getMyAssignedAstronauts, submitClinicalReview } from "../../lib/api";
 import { useAuth } from "../../context/AuthContext";
-import { LoadingState } from "../shared/LoadingState";
+import { LoadingState, EmptyState } from "../shared/LoadingState";
 import AssignedCrewSelector from "./AssignedCrewSelector";
 import ClinicalTriageHub from "./ClinicalTriageHub";
 import RecommendationSender from "./RecommendationSender";
@@ -23,6 +23,7 @@ const riskMap: Record<string, "LOW" | "WATCH" | "WARNING" | "CRITICAL"> = {
 export default function MedicalOfficerDashboard() {
   const { user } = useAuth();
   const [crew, setCrew] = useState<CrewMember[]>([]);
+  const [loadingCrew, setLoadingCrew] = useState(true);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [alerts, setAlerts] = useState<MedicalAlert[]>([]);
   const [alertsLoading, setAlertsLoading] = useState(false);
@@ -44,13 +45,17 @@ export default function MedicalOfficerDashboard() {
   }, []);
 
   const loadCrew = useCallback(async () => {
-    const [crewRes, peersRes] = await Promise.all([getMyAssignedAstronauts(), getMedicalCommunicationPeers()]);
-    if (crewRes.success) {
-      const next = ((crewRes.data as { astronauts?: CrewMember[] })?.astronauts || []);
-      setCrew(next);
-      setSelectedId((current) => current && next.some((item) => item.astronautId === current) ? current : next[0]?.astronautId || null);
+    try {
+      const [crewRes, peersRes] = await Promise.all([getMyAssignedAstronauts(), getMedicalCommunicationPeers()]);
+      if (crewRes.success) {
+        const next = ((crewRes.data as { astronauts?: CrewMember[] })?.astronauts || []);
+        setCrew(next);
+        setSelectedId((current) => current && next.some((item) => item.astronautId === current) ? current : next[0]?.astronautId || null);
+      }
+      if (peersRes.success) setPeers(((peersRes.data as { peers?: CommunicationPeer[] })?.peers || []));
+    } finally {
+      setLoadingCrew(false);
     }
-    if (peersRes.success) setPeers(((peersRes.data as { peers?: CommunicationPeer[] })?.peers || []));
   }, []);
 
   useEffect(() => { void Promise.resolve().then(() => loadCrew()); }, [loadCrew]);
@@ -119,8 +124,17 @@ export default function MedicalOfficerDashboard() {
     }
   };
 
-  if (!crew.length) {
+  if (loadingCrew) {
     return <LoadingState message="Loading your assigned astronaut roster…" />;
+  }
+
+  if (!crew.length) {
+    return (
+      <EmptyState
+        title="No Astronauts Assigned"
+        description="Mission Control has not assigned any astronauts to your roster yet. Once an astronaut is assigned to you, their telemetry, triage, and telemedicine channel will appear here."
+      />
+    );
   }
 
   return (
@@ -140,10 +154,10 @@ export default function MedicalOfficerDashboard() {
         <div className="flex items-center gap-3">
           <div className="text-right font-mono text-xs">
             <p className="text-[10px] uppercase text-slate-400">Flight Surgeon</p>
-            <p className="font-bold text-cyan-300">{user?.name || "Dr. Sarah Wilson"}</p>
+            <p className="font-bold text-cyan-300">{user?.name || "Flight Surgeon"}</p>
           </div>
           <div className="flex h-10 w-10 items-center justify-center rounded-xl border border-cyan-400/40 bg-cyan-400/10 font-mono font-bold text-cyan-300 shadow-[0_0_15px_rgba(6,182,212,0.2)]">
-            {(user?.name || "SW")
+            {(user?.name || "Flight Surgeon")
               .split(" ")
               .filter((word) => word.length > 1)
               .map((word) => word[0])

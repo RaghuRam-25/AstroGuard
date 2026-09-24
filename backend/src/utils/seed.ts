@@ -15,6 +15,22 @@ const seedDatabase = async () => {
     console.log("🌱 Starting AstroGuard database seed v2.0...");
     await connectDB();
 
+    // Only seed an empty database. Refuse to wipe existing records (including
+    // real registered astronauts / medical officers) unless explicitly forced.
+    const force = process.argv.includes("--force") || process.env.SEED_FORCE === "1";
+    const hasData = (await Promise.all([
+      User.estimatedDocumentCount(),
+      Astronaut.estimatedDocumentCount(),
+      Mission.estimatedDocumentCount(),
+    ])).some((count) => count > 0);
+
+    if (hasData && !force) {
+      console.warn("⚠️ Database already contains users / astronauts / missions — skipping seed to protect live records.");
+      console.warn("   Re-run with `npm run seed -- --force` (or SEED_FORCE=1) to wipe and reseed demo data.");
+      await mongoose.disconnect();
+      process.exit(0);
+    }
+
     // 1. Clear existing collections
     console.log("🧹 Clearing existing data...");
     await User.deleteMany({});
