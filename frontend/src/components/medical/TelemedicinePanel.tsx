@@ -13,7 +13,7 @@ import {
   Video,
   Wifi,
 } from "lucide-react";
-import { API_BASE_URL, getMedicalCommunicationMessages, markMedicalCommunicationRead, sendMedicalCommunicationMessage } from "../../lib/api";
+import { API_BASE_URL, getStoredAccessToken, getMedicalCommunicationMessages, markMedicalCommunicationRead, sendMedicalCommunicationMessage } from "../../lib/api";
 import { ChatMessage, CommunicationPeer } from "./types";
 
 export interface TelemedicinePanelProps {
@@ -63,7 +63,8 @@ export default function TelemedicinePanel({ peer, astronautName, onInitiateCall 
       setSocketReady(false);
       return;
     }
-    const socket = io(API_BASE_URL, { withCredentials: true, transports: ["websocket", "polling"] });
+    const token = getStoredAccessToken();
+    const socket = io(API_BASE_URL, { withCredentials: true, transports: ["websocket", "polling"], auth: { token }, extraHeaders: token ? { Authorization: `Bearer ${token}` } : {} });
     socketRef.current = socket;
     socket.on("connect", () => { setSocketReady(true); });
     socket.on("disconnect", () => setSocketReady(false));

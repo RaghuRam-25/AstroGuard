@@ -56,9 +56,16 @@ export function attachCommunicationSocket(server: HttpServer) {
       if (!token) return next(new Error("Authentication required"));
       const payload = verifyAccessToken(token);
       const user = await User.findById(payload.id);
-      if (!user || !user.isActive || !["astronaut", "medical_officer", "mission_control", "admin"].includes(user.role)) {
-        return next(new Error("Communication access denied"));
+      if (!user || !user.isActive) {
+        return next(new Error("Communication session invalid or account inactive"));
       }
+
+      // STRICT ROLE RESTRICTION: Voice/video calling & telemedicine chat is Astronaut <-> Doctor ONLY.
+      // Mission Control and other unauthorized roles cannot connect to the communication socket.
+      if (!["astronaut", "medical_officer"].includes(user.role)) {
+        return next(new Error("Calling and direct communication is restricted to Astronauts and Medical Officers only."));
+      }
+
       socket.data.user = user;
       next();
     } catch {
@@ -80,18 +87,27 @@ export function attachCommunicationSocket(server: HttpServer) {
 
     socket.on("chat:send", async (payload: { receiverId?: string; message?: string; messageType?: string; attachments?: unknown[] }) => {
       const receiverId = String(payload?.receiverId || "");
-      if (!(await getCommunicationPeer(user, receiverId))) return socket.emit("communication:error", { message: "Communication peer is not assigned to you." });
+      const peer = await getCommunicationPeer(user, receiverId);
+      if (!peer) return socket.emit("communication:error", { message: "Communication peer is not assigned to you." });
       const attachments = Array.isArray(payload.attachments) ? payload.attachments.slice(0, 5) : [];
       const message = typeof payload.message === "string" ? payload.message.trim().slice(0, 10000) : "";
       if (!message && !attachments.length) return;
-      const saved = await MedicalChat.create({ senderId: userId, receiverId, message, messageType: payload.messageType === "voice" ? "voice" : attachments.length && !message ? "file" : "text", attachments });
+      const saved = await MedicalChat.create({
+        senderId: userId,
+        receiverId,
+        message,
+        messageType: payload.messageType === "voice" ? "voice" : attachments.length && !message ? "file" : "text",
+        attachments,
+      });
       const messagePayload = saved.toObject();
       io.to(`user:${userId}`).to(`user:${receiverId}`).emit("chat:message", messagePayload);
     });
 
     socket.on("chat:typing", async (payload: { receiverId?: string; typing?: boolean }) => {
       const receiverId = String(payload?.receiverId || "");
-      if (await getCommunicationPeer(user, receiverId)) io.to(`user:${receiverId}`).emit("chat:typing", { senderId: userId, typing: Boolean(payload.typing) });
+      if (await getCommunicationPeer(user, receiverId)) {
+        io.to(`user:${receiverId}`).emit("chat:typing", { senderId: userId, typing: Boolean(payload.typing) });
+      }
     });
 
     socket.on("presence:check", async (payload: { userIds?: string[] }) => {
@@ -101,24 +117,58 @@ export function attachCommunicationSocket(server: HttpServer) {
       });
     });
 
+    // ── Calling Signaling: Astronaut <-> Doctor ONLY ───────────────────
     socket.on("call:invite", async (payload: { receiverId?: string; callerId?: string; callType?: "Audio" | "Video"; roomSlug?: string; offer?: unknown }) => {
       const receiverId = String(payload?.receiverId || "");
-      if (!(await getCommunicationPeer(user, receiverId))) return socket.emit("communication:error", { message: "Call peer is not assigned to you." });
+      const peer = await getCommunicationPeer(user, receiverId);
+      if (!peer) {
+        return socket.emit("communication:error", { message: "Call peer is not assigned or authorized." });
+      }
+
+      // Enforce peer role pairing (Astronaut <-> Doctor only)
+      if (user.role === "astronaut" && peer.role !== "medical_officer") {
+        return socket.emit("communication:error", { message: "Astronauts can only call authorized Medical Officers." });
+      }
+      if (user.role === "medical_officer" && peer.role !== "astronaut") {
+        return socket.emit("communication:error", { message: "Medical Officers can only call assigned Astronauts." });
+      }
+
       const roomSlug = typeof payload?.roomSlug === "string" ? payload.roomSlug.slice(0, 160) : undefined;
-      io.to(`user:${receiverId}`).emit("call:incoming", { callerId: userId, callerName: user.name, callType: payload.callType === "Video" ? "Video" : "Audio", roomSlug, offer: payload.offer });
+      io.to(`user:${receiverId}`).emit("call:incoming", {
+        callerId: userId,
+        callerName: user.name,
+        callerRole: user.role,
+        callType: payload.callType === "Video" ? "Video" : "Audio",
+        roomSlug,
+        offer: payload.offer,
+      });
     });
 
     socket.on("call:signal", async (payload: { receiverId?: string; callerId?: string; roomSlug?: string; signal?: unknown }) => {
       const receiverId = String(payload?.receiverId || "");
-      if (await getCommunicationPeer(user, receiverId)) io.to(`user:${receiverId}`).emit("call:signal", { senderId: userId, roomSlug: payload?.roomSlug, signal: payload.signal });
+      if (await getCommunicationPeer(user, receiverId)) {
+        io.to(`user:${receiverId}`).emit("call:signal", {
+          senderId: userId,
+          roomSlug: payload?.roomSlug,
+          signal: payload.signal,
+        });
+      }
     });
 
     socket.on("call:status", async (payload: { receiverId?: string; callerId?: string; roomSlug?: string; status?: string }) => {
       const receiverId = String(payload?.receiverId || "");
-      if (await getCommunicationPeer(user, receiverId)) io.to(`user:${receiverId}`).emit("call:status", { senderId: userId, roomSlug: payload?.roomSlug, status: payload.status });
+      if (await getCommunicationPeer(user, receiverId)) {
+        io.to(`user:${receiverId}`).emit("call:status", {
+          senderId: userId,
+          roomSlug: payload?.roomSlug,
+          status: payload.status,
+        });
+      }
     });
 
-    socket.on("disconnect", async () => { await emitPresence(user, false); });
+    socket.on("disconnect", async () => {
+      await emitPresence(user, false);
+    });
   });
   return io;
 }

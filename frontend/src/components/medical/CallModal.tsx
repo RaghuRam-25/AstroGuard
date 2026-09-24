@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { io, Socket } from "socket.io-client";
 import { Camera, CameraOff, Lock, Mic, MicOff, Phone, PhoneOff, Radio, Satellite, Video, Wifi, X } from "lucide-react";
-import { API_BASE_URL, createMedicalCommunicationCall } from "../../lib/api";
+import { API_BASE_URL, createMedicalCommunicationCall, getStoredAccessToken } from "../../lib/api";
 
 export interface CallModalProps {
   open: boolean;
@@ -78,7 +78,13 @@ export default function CallModal({ open, peerId, peerName, callType, callerId, 
     endedRef.current = false;
     startedRef.current = Date.now();
 
-    const socket = io(API_BASE_URL, { withCredentials: true, transports: ["websocket", "polling"] });
+    const token = getStoredAccessToken();
+    const socket = io(API_BASE_URL || (typeof window !== "undefined" ? window.location.origin : ""), {
+      auth: { token },
+      extraHeaders: token ? { Authorization: `Bearer ${token}` } : {},
+      withCredentials: true,
+      transports: ["websocket", "polling"],
+    });
     socketRef.current = socket;
 
     const tryInvite = () => {
@@ -89,7 +95,14 @@ export default function CallModal({ open, peerId, peerName, callType, callerId, 
     };
 
     const preparePeerConnection = () => {
-      const pc = new RTCPeerConnection({ iceServers: [{ urls: "stun:stun.l.google.com:19302" }] });
+      const pc = new RTCPeerConnection({
+        iceServers: [
+          { urls: "stun:stun.l.google.com:19302" },
+          { urls: "stun:stun1.l.google.com:19302" },
+          { urls: "stun:stun2.l.google.com:19302" },
+          { urls: "stun:stun.cloudflare.com:3478" },
+        ],
+      });
       pc.onicecandidate = (event) => { if (event.candidate && peerId) socket.emit("call:signal", { receiverId: peerId, callerId, roomSlug, signal: { type: "candidate", candidate: event.candidate.toJSON() } }); };
       pc.ontrack = (event) => {
         if (callType === "Video" && remoteVideoRef.current) remoteVideoRef.current.srcObject = event.streams[0];

@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { io, Socket } from "socket.io-client";
 import { useAuth } from "../../context/AuthContext";
-import { API_BASE_URL, createMedicalCommunicationCall, getMedicalCommunicationCalls, getMedicalCommunicationMessages, getMedicalCommunicationPeers, markMedicalCommunicationRead, sendMedicalCommunicationMessage } from "../../lib/api";
+import { API_BASE_URL, getStoredAccessToken, createMedicalCommunicationCall, getMedicalCommunicationCalls, getMedicalCommunicationMessages, getMedicalCommunicationPeers, markMedicalCommunicationRead, sendMedicalCommunicationMessage } from "../../lib/api";
 import { AlertCircle, Camera, Check, CheckCheck, FileText, Mic, MicOff, Paperclip, Phone, PhoneOff, ScreenShare, Send, ShieldCheck, Sparkles, Square, UserRound, Video, VideoOff, Volume2, X } from "lucide-react";
 
 type Peer = { id: string; name: string; email: string; role: "astronaut" | "medical_officer"; astronautId?: string };
@@ -84,7 +84,7 @@ export default function MedicalConsultHub() {
   }, []);
 
   const preparePeerConnection = useCallback((receiverId: string, type: CallType) => {
-    const pc = new RTCPeerConnection({ iceServers: [{ urls: "stun:stun.l.google.com:19302" }] });
+    const pc = new RTCPeerConnection({ iceServers: [{ urls: "stun:stun.l.google.com:19302" }, { urls: "stun:stun1.l.google.com:19302" }, { urls: "stun:stun.cloudflare.com:3478" }] });
     pc.onicecandidate = (event) => { if (event.candidate) emitSignal({ type: "candidate", candidate: event.candidate.toJSON() }, receiverId); };
     pc.ontrack = (event) => { if (type === "Video" && remoteVideoRef.current) remoteVideoRef.current.srcObject = event.streams[0]; if (type === "Audio" && remoteAudioRef.current) remoteAudioRef.current.srcObject = event.streams[0]; };
     pc.onconnectionstatechange = () => { if (["failed", "disconnected", "closed"].includes(pc.connectionState)) void closeCall("Cancelled"); };
@@ -128,7 +128,8 @@ export default function MedicalConsultHub() {
     if (!user || peers.length === 0) {
       return;
     }
-    const socket = io(API_BASE_URL, { withCredentials: true, transports: ["websocket", "polling"] }); socketRef.current = socket;
+    const token = getStoredAccessToken();
+    const socket = io(API_BASE_URL, { withCredentials: true, transports: ["websocket", "polling"], auth: { token }, extraHeaders: token ? { Authorization: `Bearer ${token}` } : {} }); socketRef.current = socket;
     socket.on("connect", () => setSocketReady(true)); socket.on("disconnect", () => setSocketReady(false));
     socket.on("communication:error", (payload: { message?: string }) => setError(payload.message || "Communication error."));
     socket.on("presence:update", (payload: { userId: string; online: boolean }) => { if (payload.userId === peerRef.current?.id) setOnline(payload.online); });
