@@ -24,6 +24,7 @@ import adminRoutes from "./routes/admin.routes.js";
 import publicRoutes from "./routes/public.routes.js";
 import userRoutes from "./routes/user.routes.js";
 import missionRoutes from "./routes/mission.routes.js";
+import deviceRoutes from "./routes/device.routes.js";
 import { successResponse } from "./utils/response.js";
 
 const app: Application = express();
@@ -118,10 +119,12 @@ app.use("/api/v1/chat", medicalCommunicationRoutes);
 app.use("/api/clinical-operations", clinicalOperationsRoutes);
 app.use("/api/alerts", alertRoutes);
 app.use("/api/upload", uploadRoutes);
+app.use("/api/devices", deviceRoutes);
 
 // v1 compatibility routes (for requests hitting /api/v1/...)
 app.use("/api/v1/telemetry", telemetryRoutes);
 app.use("/api/v1/nutrition", nutritionRoutes);
+app.use("/api/v1/devices", deviceRoutes);
 app.use("/api/v1/alerts", alertRoutes);
 app.use("/api/v1/admin", adminRoutes);
 app.use("/api/v1/public", publicRoutes);

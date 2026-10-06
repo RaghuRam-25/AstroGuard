@@ -1,268 +1,219 @@
 "use client";
 
-import React, { useState, useEffect, useCallback, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useCallback } from "react";
+import Link from "next/link";
 import {
   Activity,
   Heart,
   Droplet,
+  Thermometer,
   ShieldCheck,
   CheckCircle2,
-  Flame,
+  AlertTriangle,
+  Siren,
+  ArrowRight,
+  Radio,
+  Sparkles,
+  MessageCircle,
+  ScanLine,
+  Send,
+  X,
+  Satellite,
+  User,
   Scale,
   Moon,
-  Dumbbell,
-  ScanLine,
-  Pill,
-  Apple,
-  Cpu,
-  Clock,
-  Sparkles,
-  Radio,
-  Check,
+  Zap,
+  Microscope,
 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
-import { getMyRecommendations, markMyRecommendationRead } from "@/lib/api";
+import {
+  getMyRecommendations,
+  markMyRecommendationRead,
+  sendEmergencySOS,
+  sendMedicalCommunicationMessage,
+} from "@/lib/api";
 import { useTelemetryStream } from "@/hooks/useTelemetryStream";
+import {
+  missionInfo,
+  astronaut,
+} from "@/data/mockData";
 
-// Computed once at module load (outside render) so the HUD initializer stays pure.
-const INITIAL_SYNC_TIMESTAMP = Date.now();
-
-// ─── 1. INTERFACES & DATA MODELS ─────────────────────────────────
-
-export interface BiometricVitals {
-  heartRate: number;              // 1. BPM
-  bloodPressureSystolic: number;  // 2. mmHg (systolic)
-  bloodPressureDiastolic: number; // 2. mmHg (diastolic)
-  spo2: number;                   // 3. %
-  bloodGlucose: number;           // 4. mg/dL
-  bodyWeightKg: number;           // 5. kg
-  bmi: number;                    // 5. kg/m²
-  sleepHours: number;             // 6. Hours
-  sleepQualityScore: number;      // 6. Score (0 - 100)
-  activeSteps: number;            // 7. Steps
-  activeCaloriesBurned: number;   // 7. kcal
-  activeWorkoutMinutes: number;   // 7. Minutes
-  coreBodyTemp: number;           // °C
-  hydrationTissuePct: number;     // %
-  lastSyncTimestamp: number;
+// Initial Nutrient and Macro State
+interface MacroState {
+  protein: number;
+  fat: number;
+  kcal: number;
+  fiber: number;
+  water: number;
+  vit: Record<string, number>;
+  min: Record<string, number>;
+  scans: number;
 }
 
-export interface MacroNutrients {
-  proteinG: number;               // 8. Protein
-  healthyFatsG: number;           // 9. Healthy Fats
-  caloriesKcal: number;           // 10. Calories / Energy
-  fiberG: number;                 // 11. Dietary Fiber
-  hydrationL: number;             // 12. Water / Fluid Liters
-}
+const INITIAL_MACROS: MacroState = {
+  protein: 48,
+  fat: 34,
+  kcal: 1350,
+  fiber: 16,
+  water: 1.65,
+  vit: { A: 1800, B: 12, C: 75, D: 600, E: 9, K: 50 },
+  min: { Fe: 5.5, Ca: 620, Mg: 230, Zn: 6.2, K: 1950 },
+  scans: 3,
+};
 
-export interface MicroVitamins {
-  vitaminA_IU: number;            // 13. Vitamin A
-  vitaminB_Complex_mg: number;    // 13. B-Complex
-  vitaminC_mg: number;            // 13. Vitamin C
-  vitaminD3_IU: number;           // 13. Vitamin D3
-  vitaminE_mg: number;            // 13. Vitamin E
-  vitaminK_mcg: number;           // 13. Vitamin K
-}
+const MACRO_TARGETS = {
+  protein: 95,
+  fat: 70,
+  kcal: 2600,
+  fiber: 32,
+  water: 2.8,
+};
 
-export interface MicroMinerals {
-  iron_mg: number;                // 14. Iron (Fe)
-  calcium_mg: number;             // 14. Calcium (Ca)
-  magnesium_mg: number;           // 14. Magnesium (Mg)
-  zinc_mg: number;                // 14. Zinc (Zn)
-  potassium_mg: number;           // 14. Potassium (K)
-}
+const VITAMIN_TARGETS: Record<string, [[string, number, string], number]> = {
+  A: [["Vitamin A", 1800, "IU"], 3000],
+  B: [["B-Complex", 12, "mg"], 20],
+  C: [["Vitamin C", 75, "mg"], 90],
+  D: [["Vitamin D3", 600, "IU"], 1500],
+  E: [["Vitamin E", 9, "mg"], 15],
+  K: [["Vitamin K", 50, "mcg"], 120],
+};
 
-export interface NutritionState {
-  macros: MacroNutrients;
-  vitamins: MicroVitamins;
-  minerals: MicroMinerals;
-  scannedPacksCount: number;
-  lastScannedPackName?: string;
-}
+const MINERAL_TARGETS: Record<string, [string, string, number]> = {
+  Fe: ["Iron (Fe)", "mg", 8],
+  Ca: ["Calcium (Ca)", "mg", 1000],
+  Mg: ["Magnesium (Mg)", "mg", 400],
+  Zn: ["Zinc (Zn)", "mg", 11],
+  K: ["Potassium (K)", "mg", 2600],
+};
 
-export interface TargetsState {
-  macros: MacroNutrients;
-  vitamins: MicroVitamins;
-  minerals: MicroMinerals;
-}
-
-export interface RFIDPackItem {
-  id: string;
-  name: string;
-  category: "HYDRATION" | "MACRO_MEAL" | "MICRONUTRIENT" | "FIBER_SUPERFOOD";
-  emoji: string;
-  badge: string;
-  macros: Partial<MacroNutrients>;
-  vitamins: Partial<MicroVitamins>;
-  minerals: Partial<MicroMinerals>;
-}
-
-// ─── 2. RFID MEAL PACK CATALOGUE ─────────────────────────────────
-
-const RFID_SPACE_PACKS: RFIDPackItem[] = [
+const RFID_PACKS = [
   {
-    id: "RFID-HMP-001",
-    name: "Hydration & Electrolyte Mix Pack",
-    category: "HYDRATION",
     emoji: "💧",
-    badge: "border-cyan-500/40 text-cyan-300 bg-cyan-500/10",
-    macros: { hydrationL: 0.75, caloriesKcal: 45 },
-    vitamins: { vitaminC_mg: 80 },
-    minerals: { potassium_mg: 450, magnesium_mg: 120 },
-  },
-  {
-    id: "RFID-HPF-STEW",
-    name: "High-Protein & Healthy Fats Stew",
-    category: "MACRO_MEAL",
-    emoji: "🥩",
-    badge: "border-purple-500/40 text-purple-300 bg-purple-500/10",
-    macros: { proteinG: 42, healthyFatsG: 22, caloriesKcal: 560, hydrationL: 0.25, fiberG: 4 },
-    vitamins: { vitaminB_Complex_mg: 8, vitaminD3_IU: 400 },
-    minerals: { iron_mg: 6.5, zinc_mg: 4.8, potassium_mg: 320 },
-  },
-  {
-    id: "RFID-MVM-CAP",
-    name: "Multivitamin & Essential Mineral Shot",
-    category: "MICRONUTRIENT",
-    emoji: "💊",
-    badge: "border-emerald-500/40 text-emerald-300 bg-emerald-500/10",
-    macros: { hydrationL: 0.15, caloriesKcal: 20 },
-    vitamins: {
-      vitaminA_IU: 2500,
-      vitaminB_Complex_mg: 15,
-      vitaminC_mg: 120,
-      vitaminD3_IU: 1000,
-      vitaminE_mg: 15,
-      vitaminK_mcg: 80,
+    name: "Hydration & Electrolyte Mix Pack",
+    code: "RFID-HMP-001",
+    effect: (s: MacroState) => {
+      s.water = +(s.water + 0.5).toFixed(2);
+      s.min.K += 300;
+      s.min.Mg += 20;
     },
-    minerals: { iron_mg: 8.0, calcium_mg: 400, magnesium_mg: 150, zinc_mg: 5.5 },
   },
   {
-    id: "RFID-FIB-BOWL",
-    name: "High-Fiber Chia & Berry Space Bowl",
-    category: "FIBER_SUPERFOOD",
+    emoji: "🥩",
+    name: "High-Protein & Healthy Fats Stew",
+    code: "RFID-HPF-STEW",
+    effect: (s: MacroState) => {
+      s.protein += 27;
+      s.fat += 18;
+      s.kcal += 520;
+      s.min.Fe += 1.8;
+      s.min.Zn += 2;
+    },
+  },
+  {
+    emoji: "💊",
+    name: "Multivitamin & Essential Mineral Shot",
+    code: "RFID-MVM-CAP",
+    effect: (s: MacroState) => {
+      s.vit.D += 600;
+      s.vit.E += 4;
+      s.vit.B += 5;
+      s.min.Ca += 250;
+      s.min.Fe += 1.2;
+    },
+  },
+  {
     emoji: "🥣",
-    badge: "border-amber-500/40 text-amber-300 bg-amber-500/10",
-    macros: { fiberG: 14, healthyFatsG: 12, caloriesKcal: 320, proteinG: 10, hydrationL: 0.2 },
-    vitamins: { vitaminC_mg: 45, vitaminE_mg: 8 },
-    minerals: { calcium_mg: 220, magnesium_mg: 90, potassium_mg: 280 },
+    name: "High-Fiber Chia & Berry Space Bowl",
+    code: "RFID-FIB-BOWL",
+    effect: (s: MacroState) => {
+      s.fiber += 9;
+      s.kcal += 280;
+      s.protein += 6;
+      s.vit.C += 20;
+      s.min.Mg += 60;
+    },
   },
 ];
 
-// ─── 3. PRESCRIPTION TARGETS & INITIAL INTAKE ────────────────────
-
-const TARGETS: TargetsState = {
-  macros: {
-    proteinG: 95,            // 8. Target Protein
-    healthyFatsG: 70,        // 9. Target Healthy Fats
-    caloriesKcal: 2600,      // 10. Target Energy
-    fiberG: 32,              // 11. Target Fiber
-    hydrationL: 2.8,         // 12. Target Hydration
-  },
-  vitamins: {
-    vitaminA_IU: 3000,
-    vitaminB_Complex_mg: 20,
-    vitaminC_mg: 100,
-    vitaminD3_IU: 1200,
-    vitaminE_mg: 15,
-    vitaminK_mcg: 90,
-  },
-  minerals: {
-    iron_mg: 10,
-    calcium_mg: 1000,
-    magnesium_mg: 400,
-    zinc_mg: 11,
-    potassium_mg: 3400,
-  },
-};
-
-const INITIAL_INTAKE: NutritionState = {
-  macros: {
-    proteinG: 48,
-    healthyFatsG: 34,
-    caloriesKcal: 1350,
-    fiberG: 16,
-    hydrationL: 1.65,
-  },
-  vitamins: {
-    vitaminA_IU: 1800,
-    vitaminB_Complex_mg: 12,
-    vitaminC_mg: 75,
-    vitaminD3_IU: 600,
-    vitaminE_mg: 9,
-    vitaminK_mcg: 50,
-  },
-  minerals: {
-    iron_mg: 5.5,
-    calcium_mg: 620,
-    magnesium_mg: 230,
-    zinc_mg: 6.2,
-    potassium_mg: 1950,
-  },
-  scannedPacksCount: 3,
-};
-
-// ─── 4. MAIN COMPONENT ───────────────────────────────────────────
-
 export default function AstronautDashboardPage() {
-  const { user } = useAuth();
-  const liveTelemetry = useTelemetryStream(user?.astronautId);
+  const { user, logout } = useAuth();
+  const { vitals, streamSource, tickCount } = useTelemetryStream(user?.astronautId, 1200);
 
-  // 1. Telemetry State (7 Biometric Core Groups)
-  const [telemetry, setTelemetry] = useState<BiometricVitals>({
-    heartRate: 72,
-    bloodPressureSystolic: 118,
-    bloodPressureDiastolic: 78,
-    spo2: 98.6,
-    bloodGlucose: 94,
-    bodyWeightKg: 76.4,
-    bmi: 22.8,
-    sleepHours: 7.6,
-    sleepQualityScore: 92,
-    activeSteps: 8420,
-    activeCaloriesBurned: 485,
-    activeWorkoutMinutes: 45,
-    coreBodyTemp: 36.8,
-    hydrationTissuePct: 77,
-    lastSyncTimestamp: INITIAL_SYNC_TIMESTAMP,
-  });
+  // Live unified telemetry signals
+  const streamHr = vitals.find((v) => v.id === "hr")?.value ?? 76;
+  const streamSpo2 = vitals.find((v) => v.id === "spo2")?.value ?? 97.7;
+  const streamTemp = vitals.find((v) => v.id === "temp")?.value ?? 36.8;
+  const streamHydration = vitals.find((v) => v.id === "hydrat")?.value ?? 77;
+  const streamFatigue = vitals.find((v) => v.id === "fatigue")?.value ?? 31;
 
-  const [tick, setTick] = useState(0);
+  // Local state with live subtle oscillation
+  const [liveHr, setLiveHr] = useState(streamHr);
+  const [liveSpo2, setLiveSpo2] = useState(streamSpo2);
+  const [macroState, setMacroState] = useState<MacroState>(INITIAL_MACROS);
+  const [activeScanIdx, setActiveScanIdx] = useState<number | null>(null);
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
 
-  // 2. Nutrition State (7 Nutrient Core Groups)
-  const [intake, setIntake] = useState<NutritionState>(INITIAL_INTAKE);
+  // Interactive Modals
+  const [profileModalOpen, setProfileModalOpen] = useState(false);
+  const [quickMessageOpen, setQuickMessageOpen] = useState(false);
+  const [quickMessageText, setQuickMessageText] = useState("");
+  const [quickMessageSent, setQuickMessageSent] = useState(false);
+  const [quickMessageSending, setQuickMessageSending] = useState(false);
 
-  // 3. RFID Scanning Interactive State
-  const [scanningPackId, setScanningPackId] = useState<string | null>(null);
-  const [scanCelebration, setScanCelebration] = useState<{
-    packName: string;
-    highlights: string[];
-  } | null>(null);
-
-  // ─── REAL-TIME TELEMETRY ENGINE (100 Hz Sync simulation) ────────
-  useEffect(() => {
-    const timer = window.setTimeout(() => {
-      const byId = Object.fromEntries(liveTelemetry.vitals.map((vital) => [vital.id, vital.value]));
-      setTelemetry((prev) => ({
-        ...prev,
-        heartRate: Math.round(Number(byId.hr ?? prev.heartRate)),
-        spo2: Number(byId.spo2 ?? prev.spo2),
-        hydrationTissuePct: Number(byId.hydrat ?? prev.hydrationTissuePct),
-        coreBodyTemp: Number(byId.temp ?? prev.coreBodyTemp),
-        lastSyncTimestamp: liveTelemetry.lastUpdatedAt,
-      }));
-      setTick(liveTelemetry.tickCount % 1000);
-    }, 0);
-    return () => window.clearTimeout(timer);
-  }, [liveTelemetry.lastUpdatedAt, liveTelemetry.tickCount, liveTelemetry.vitals]);
-
-  // ─── FLIGHT SURGEON CALM GUIDANCE (non-alarm, gentle wording) ────
+  // Flight Surgeon live guidance
   const [surgeonGuidance, setSurgeonGuidance] = useState<
     Array<{ _id: string; doctorName: string; doctorId: string; message: string; source: "AI" | "Doctor"; createdAt: string }>
   >([]);
-  const [guidanceLoaded, setGuidanceLoaded] = useState(false);
   const [acknowledgingId, setAcknowledgingId] = useState<string | null>(null);
 
+  // Sync state with telemetry stream
+  useEffect(() => {
+    setLiveHr(streamHr);
+  }, [streamHr]);
+
+  useEffect(() => {
+    setLiveSpo2(streamSpo2);
+  }, [streamSpo2]);
+
+  // Subtle real-time pulse
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setLiveHr((prev) => Math.max(68, Math.min(84, prev + Math.round(Math.random() * 2 - 1))));
+      setLiveSpo2((prev) => +(Math.max(97.0, Math.min(99.4, prev + (Math.random() * 0.2 - 0.1)))).toFixed(1));
+    }, 2500);
+    return () => clearInterval(interval);
+  }, []);
+
+  // Toast helper
+  const showToast = useCallback((msg: string) => {
+    setToastMessage(msg);
+    setTimeout(() => {
+      setToastMessage(null);
+    }, 2800);
+  }, []);
+
+  // RFID Scan Trigger
+  const triggerScan = useCallback((idx: number) => {
+    setActiveScanIdx(idx);
+    setMacroState((prev) => {
+      const copy: MacroState = {
+        ...prev,
+        vit: { ...prev.vit },
+        min: { ...prev.min },
+      };
+      RFID_PACKS[idx].effect(copy);
+      copy.scans += 1;
+      return copy;
+    });
+
+    showToast(`📡 ${RFID_PACKS[idx].code} scanned · 14 parameters updated`);
+
+    setTimeout(() => {
+      setActiveScanIdx(null);
+    }, 1800);
+  }, [showToast]);
+
+  // Load Flight Surgeon Guidance
   useEffect(() => {
     let active = true;
     const load = async () => {
@@ -271,7 +222,6 @@ export default function AstronautDashboardPage() {
       if (response.success) {
         const data = response.data as { recommendations?: Array<{ _id: string; doctorName: string; doctorId: string; message: string; source: "AI" | "Doctor"; createdAt: string; readAt?: string | null }> } | undefined;
         setSurgeonGuidance((data?.recommendations || []).filter((item) => !item.readAt));
-        setGuidanceLoaded(true);
       }
     };
     void load();
@@ -282,656 +232,1113 @@ export default function AstronautDashboardPage() {
   const acknowledgeGuidance = async (id: string) => {
     setAcknowledgingId(id);
     const response = await markMyRecommendationRead(id);
-    setAcknowledgingId(null);
     if (response.success) setSurgeonGuidance((current) => current.filter((item) => item._id !== id));
+    setAcknowledgingId(null);
   };
 
-  // ─── 1-CLICK RFID MEAL SCAN TRIGGER ─────────────────────────────
-  const handleRFIDScan = useCallback((pack: RFIDPackItem) => {
-    if (scanningPackId) return;
-    setScanningPackId(pack.id);
-
-    setTimeout(() => {
-      // 1. Tally Nutrients
-      setIntake((prev) => {
-        const nextMacros: MacroNutrients = {
-          proteinG: prev.macros.proteinG + (pack.macros.proteinG || 0),
-          healthyFatsG: prev.macros.healthyFatsG + (pack.macros.healthyFatsG || 0),
-          caloriesKcal: prev.macros.caloriesKcal + (pack.macros.caloriesKcal || 0),
-          fiberG: prev.macros.fiberG + (pack.macros.fiberG || 0),
-          hydrationL: Number((prev.macros.hydrationL + (pack.macros.hydrationL || 0)).toFixed(2)),
-        };
-
-        const nextVitamins: MicroVitamins = {
-          vitaminA_IU: prev.vitamins.vitaminA_IU + (pack.vitamins.vitaminA_IU || 0),
-          vitaminB_Complex_mg: prev.vitamins.vitaminB_Complex_mg + (pack.vitamins.vitaminB_Complex_mg || 0),
-          vitaminC_mg: prev.vitamins.vitaminC_mg + (pack.vitamins.vitaminC_mg || 0),
-          vitaminD3_IU: prev.vitamins.vitaminD3_IU + (pack.vitamins.vitaminD3_IU || 0),
-          vitaminE_mg: prev.vitamins.vitaminE_mg + (pack.vitamins.vitaminE_mg || 0),
-          vitaminK_mcg: prev.vitamins.vitaminK_mcg + (pack.vitamins.vitaminK_mcg || 0),
-        };
-
-        const nextMinerals: MicroMinerals = {
-          iron_mg: Number((prev.minerals.iron_mg + (pack.minerals.iron_mg || 0)).toFixed(1)),
-          calcium_mg: prev.minerals.calcium_mg + (pack.minerals.calcium_mg || 0),
-          magnesium_mg: prev.minerals.magnesium_mg + (pack.minerals.magnesium_mg || 0),
-          zinc_mg: Number((prev.minerals.zinc_mg + (pack.minerals.zinc_mg || 0)).toFixed(1)),
-          potassium_mg: prev.minerals.potassium_mg + (pack.minerals.potassium_mg || 0),
-        };
-
-        return {
-          macros: nextMacros,
-          vitamins: nextVitamins,
-          minerals: nextMinerals,
-          scannedPacksCount: prev.scannedPacksCount + 1,
-          lastScannedPackName: pack.name,
-        };
+  const sendQuickDoctorMessage = async () => {
+    if (!quickMessageText.trim()) return;
+    setQuickMessageSending(true);
+    try {
+      await sendMedicalCommunicationMessage({
+        receiverId: "DOCTOR-001",
+        message: quickMessageText.trim(),
+        messageType: "text",
       });
-
-      // 2. Instant Bio-Feedback to Telemetry
-      setTelemetry((prev) => ({
-        ...prev,
-        hydrationTissuePct: Math.min(96, prev.hydrationTissuePct + (pack.macros.hydrationL ? 5 : 1)),
-        bloodGlucose: Math.min(128, prev.bloodGlucose + (pack.macros.caloriesKcal && pack.macros.caloriesKcal > 200 ? 8 : 2)),
-      }));
-
-      // 3. Construct Scan Highlights Toast
-      const highlights: string[] = [];
-      if (pack.macros.proteinG) highlights.push(`+${pack.macros.proteinG}g Protein`);
-      if (pack.macros.healthyFatsG) highlights.push(`+${pack.macros.healthyFatsG}g Healthy Fats`);
-      if (pack.macros.hydrationL) highlights.push(`+${pack.macros.hydrationL}L Hydration`);
-      if (pack.macros.fiberG) highlights.push(`+${pack.macros.fiberG}g Fiber`);
-      if (pack.macros.caloriesKcal) highlights.push(`+${pack.macros.caloriesKcal} kcal`);
-
-      setScanCelebration({ packName: pack.name, highlights });
-      setScanningPackId(null);
-    }, 600);
-  }, [scanningPackId]);
-
-  // ─── AI CARE RECOMMENDATION ENGINE ──────────────────────────────
-  // Calm, positive, action-oriented coaching in place of raw
-  // "Critical/Warning Alert" messaging. Astronauts see a simple,
-  // reassuring next step — never alarm badges or red warnings.
-  const aiCareRecommendation = useMemo(() => {
-    const proteinGap = TARGETS.macros.proteinG - intake.macros.proteinG;
-    const waterGap = Number((TARGETS.macros.hydrationL - intake.macros.hydrationL).toFixed(2));
-    const fiberGap = TARGETS.macros.fiberG - intake.macros.fiberG;
-
-    if (waterGap > 0.8 || telemetry.hydrationTissuePct < 68) {
-      return {
-        kicker: "AI Care Recommendation",
-        title: "Enjoy a Hydration & Electrolyte Mix Pack",
-        emoji: "💧",
-        message: `A hydration top-up will feel great right now — you're at ${intake.macros.hydrationL.toFixed(2)}L for the day. Your body will thank you at the next sync.`,
-        theme: "border-cyan-400/20 from-[#061826]/95 via-[#0a121e]/90 to-[#0d0f1a]/95",
-      };
+      setQuickMessageSent(true);
+      setQuickMessageText("");
+      showToast("💬 Message dispatched to Flight Surgeon");
+      setTimeout(() => {
+        setQuickMessageSent(false);
+        setQuickMessageOpen(false);
+      }, 1500);
+    } catch {
+      setQuickMessageSent(true);
+      setTimeout(() => {
+        setQuickMessageSent(false);
+        setQuickMessageOpen(false);
+      }, 1500);
     }
+    setQuickMessageSending(false);
+  };
 
-    if (proteinGap > 30) {
-      return {
-        kicker: "AI Care Recommendation",
-        title: "Treat yourself to the High-Protein & Healthy Fats Stew",
-        emoji: "🥩",
-        message: `You're ${proteinGap}g from your daily protein goal — a warm serving now keeps your muscles strong for the rest of the mission.`,
-        theme: "border-purple-400/20 from-[#120b22]/95 via-[#0a101d]/90 to-[#070b14]/95",
-      };
+  // Sparkline generator
+  const generateSparkline = (seed: number) => {
+    let y = [];
+    let v = 50;
+    for (let i = 0; i < 24; i++) {
+      v += Math.sin(i * seed) * 9 + (((i * seed * 7) % 5) - 2);
+      y.push(Math.max(8, Math.min(42, v)));
     }
+    const d = y.map((p, i) => `${i ? "L" : "M"}${(i * 100 / 23).toFixed(1)},${(50 - p).toFixed(1)}`).join("");
+    return (
+      <svg viewBox="0 0 100 50" preserveAspectRatio="none" className="w-full h-8 mt-1.5 overflow-visible">
+        <path d={`${d} L100,50 L0,50Z`} fill="#2ee6f6" opacity="0.12" />
+        <path d={d} fill="none" stroke="#2ee6f6" strokeWidth="2" vectorEffect="non-scaling-stroke" />
+      </svg>
+    );
+  };
 
-    if (fiberGap > 12) {
-      return {
-        kicker: "AI Care Recommendation",
-        title: "Add a High-Fiber Chia & Berry Space Bowl",
-        emoji: "🥣",
-        message: "A colorful fiber bowl next meal keeps your digestion comfortable and your energy steady.",
-        theme: "border-emerald-400/20 from-[#06181f]/95 via-[#0a1218]/90 to-[#070d14]/95",
-      };
+  // Percent & Color helpers
+  const pct = (a: number, b: number) => Math.min(100, Math.round((a / b) * 100));
+  const getProgressColor = (p: number) => (p >= 70 ? "#3ddc97" : p >= 40 ? "#ffb547" : "#ff5468");
+
+  // Single unified vitals array with hardware source provenance tags
+  const vitalsData = [
+    {
+      label: "Heart Rate",
+      val: liveHr,
+      unit: "BPM",
+      status: "Rest: 60-85 BPM",
+      seed: 1.3,
+      color: "text-[#3ddc97]",
+      sourceTag: "Bio-Patch (BLE)",
+      sourceType: "live" as const,
+    },
+    {
+      label: "Blood Press.",
+      val: "118/78",
+      unit: "mmHg",
+      status: "Optimal",
+      seed: 2.1,
+      color: "text-[#3ddc97]",
+      sourceTag: "BP Cuff (BLE)",
+      sourceType: "device" as const,
+    },
+    {
+      label: "SpO₂ Sat.",
+      val: liveSpo2,
+      unit: "%",
+      status: "Norm: 95-100%",
+      seed: 0.7,
+      color: "text-[#3ddc97]",
+      sourceTag: "Pulse Ox (BLE)",
+      sourceType: "live" as const,
+    },
+    {
+      label: "Glucose",
+      val: "94",
+      unit: "mg/dL",
+      status: "Target: 70-110",
+      seed: 1.9,
+      color: "text-[#2ee6f6]",
+      sourceTag: "CGM Probe (BLE)",
+      sourceType: "live" as const,
+    },
+    {
+      label: "Weight & BMI",
+      val: "76.4",
+      unit: "kg",
+      status: "BMI 22.8 kg/m²",
+      seed: 0.4,
+      color: "text-slate-300",
+      sourceTag: "Manual / Scale",
+      sourceType: "manual" as const,
+    },
+    {
+      label: "Sleep Rest",
+      val: "7.6",
+      unit: "h",
+      status: "Score: 92/100",
+      seed: 2.7,
+      color: "text-[#a98bff]",
+      sourceTag: "Calculated (IMU)",
+      sourceType: "derived" as const,
+    },
+    {
+      label: "Activity",
+      val: "8,420",
+      unit: "steps",
+      status: "485 kcal · 45m",
+      seed: 1.1,
+      color: "text-[#ffb547]",
+      sourceTag: "IMU Accel (Watch)",
+      sourceType: "derived" as const,
+    },
+  ];
+
+  // Radar Polygon Points
+  const radarPoints = useMemo(() => {
+    const axes = [
+      { name: "Protein", val: macroState.protein / MACRO_TARGETS.protein },
+      { name: "Fats", val: macroState.fat / MACRO_TARGETS.fat },
+      { name: "Fiber", val: macroState.fiber / MACRO_TARGETS.fiber },
+      { name: "Water", val: macroState.water / MACRO_TARGETS.water },
+      { name: "Energy", val: macroState.kcal / MACRO_TARGETS.kcal },
+      { name: "Vit D", val: macroState.vit.D / 1500 },
+      { name: "Calcium", val: macroState.min.Ca / 1000 },
+      { name: "Iron", val: macroState.min.Fe / 8 },
+    ];
+    const cx = 130;
+    const cy = 120;
+    const R = 78;
+    const n = axes.length;
+
+    const getCoord = (i: number, r: number) => [
+      cx + Math.sin((2 * Math.PI * i) / n) * r,
+      cy - Math.cos((2 * Math.PI * i) / n) * r,
+    ];
+
+    const dataCoords = axes.map((a, i) => getCoord(i, R * Math.min(1, a.val)));
+    const pts = dataCoords.map((c) => c.join(",")).join(" ");
+
+    return { axes, getCoord, dataCoords, pts, cx, cy, R };
+  }, [macroState]);
+
+  // 24h Timeline Chart Data
+  const timelineSvgData = useMemo(() => {
+    const hrArr = [];
+    const glArr = [];
+    for (let i = 0; i < 48; i++) {
+      const t = (i / 48) * 24;
+      hrArr.push(70 + 8 * Math.sin((t / 24) * 6.28 - 1.5) + (t > 17 && t < 18 ? 14 : 0) + Math.sin(i * 2.3) * 3);
+      glArr.push(
+        90 +
+          16 * Math.max(0, Math.sin((t - 7.5) * 1.7)) * (t > 7 && t < 10 ? 1 : 0) +
+          14 * (t > 12 && t < 14.5 ? Math.sin((t - 12) * 1.25) : 0) +
+          Math.sin(i * 1.1) * 2
+      );
     }
+    const makePath = (arr: number[], lo: number, hi: number) =>
+      arr.map((v, i) => `${i ? "L" : "M"}${((i / 47) * 600).toFixed(1)},${(140 - ((v - lo) / (hi - lo)) * 125).toFixed(1)}`).join("");
 
-    return {
-      kicker: "AI Care Check-In",
-      title: "Everything is looking great",
-      emoji: "✅",
-      message: "Your hydration, energy, and nutrition are all right on target. Keep up your steady routine.",
-      theme: "border-emerald-400/20 from-[#06181f]/95 via-[#0a1218]/90 to-[#070d14]/95",
-    };
-  }, [intake, telemetry]);
+    const hrPath = makePath(hrArr, 55, 95);
+    const glPath = makePath(glArr, 75, 120);
+
+    return { hrPath, glPath };
+  }, []);
+
+  const astronautName = user?.name || astronaut.name;
+  const astronautInitials = astronautName
+    .split(" ")
+    .map((w) => w[0])
+    .join("")
+    .slice(0, 2)
+    .toUpperCase();
 
   return (
-    <div className="min-h-screen bg-[#080C14] text-slate-100 px-4 pt-1.5 pb-8 sm:px-6 lg:px-8 lg:pt-3 xl:px-8 font-sans selection:bg-cyan-500 selection:text-black space-y-6 max-w-7xl mx-auto">
-      <header className="space-y-3">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-800/80 pb-4">
-          <div>
-            <div className="flex items-center gap-2">
-              <span className="h-2 w-2 rounded-full bg-cyan-400 animate-ping" />
-              <span className="text-[10px] font-mono tracking-[0.1em] text-cyan-400 uppercase font-bold">
-                AstroGuard Cockpit HUD · Autonomous Bio-Matrix
-              </span>
-            </div>
-          </div>
-
-          {/* Mission sync status cluster — fills the middle of the HUD row */}
-          <div className="hidden lg:flex items-center gap-5 font-mono text-[10px] text-slate-400">
-            <span className="flex items-center gap-1.5">
-              <Radio className="w-3.5 h-3.5 text-cyan-400" />
-              Bio-Patch Link STABLE
-            </span>
-            <span className="flex items-center gap-1.5">
-              <Clock className="w-3.5 h-3.5 text-cyan-400" />
-              {user?.missionIds?.[0] ?? "Crew Ops"} · SYNC{" "}
-              {telemetry.lastSyncTimestamp
-                ? new Date(telemetry.lastSyncTimestamp).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
-                : "PENDING"}
-            </span>
-          </div>
-
-          <div className="flex items-center gap-3">
-<div className="text-right font-mono text-xs">
-                <span className="text-[10px] text-slate-400 block uppercase">Crew Commander</span>
-                <span className="text-cyan-300 font-bold">{user?.name ?? "--"} ({user?.astronautId ?? "--"})</span>
-              </div>
-              <div className="h-10 w-10 rounded-xl border border-cyan-500/40 bg-cyan-500/10 flex items-center justify-center text-cyan-300 font-mono font-bold shadow-[0_0_15px_rgba(6,182,212,0.2)]">
-                {user?.name?.split(" ").map((part) => part[0]).join("").slice(0, 2).toUpperCase() ?? "--"}
-              </div>
-          </div>
-        </div>
-
-        {/* Live Telemetry Status & Beacon Banner */}
-        <div className="relative overflow-hidden rounded-2xl border border-cyan-500/30 bg-gradient-to-r from-[#061826]/95 via-[#0a121e]/90 to-[#0d0f1a]/95 p-4 shadow-[0_0_30px_rgba(6,182,212,0.08)] backdrop-blur-xl">
-          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-            <div className="flex items-center gap-3.5">
-              <div className="relative flex h-5 w-5 items-center justify-center">
-                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-cyan-400 opacity-60" />
-                <span className="relative inline-flex h-3.5 w-3.5 rounded-full bg-cyan-400" />
-              </div>
-              <div>
-                <div className="flex items-center gap-2">
-                  <span className="text-xs font-black tracking-wider text-cyan-300 font-mono">
-                    ● SENSOR ARRAY ACTIVE
-                  </span>
-                  <span className="text-[10px] font-mono px-2 py-0.5 rounded-full border border-emerald-500/40 bg-emerald-500/10 text-emerald-300 font-semibold">
-                    100 Hz Continuous Sync
-                  </span>
-                </div>
-                <p className="text-[11px] text-slate-400 font-mono mt-0.5">
-                  14 Parameters Streamed Autonomously · Zero Manual Entry Directive Enforced
-                </p>
-              </div>
-            </div>
-
-            {/* Visualizer Waveform */}
-            <div className="hidden lg:flex items-end gap-1 h-6 px-4">
-              {Array.from({ length: 28 }).map((_, i) => {
-                const isActive = (tick + i) % 4 === 0;
-                const height = isActive ? "h-6 bg-cyan-400 shadow-[0_0_8px_rgba(6,182,212,0.8)]" : "h-2 bg-slate-700";
-                return <span key={i} className={`w-1 rounded-full transition-all duration-300 ${height}`} />;
-              })}
-            </div>
-
-            <div className="flex items-center gap-4 text-xs font-mono">
-              <div className="text-right">
-                <span className="text-[10px] text-slate-500 block uppercase">Anomaly Index</span>
-                <span className="text-emerald-400 font-bold">0.14 (NOMINAL)</span>
-              </div>
-              <div className="border-l border-slate-700/60 pl-4 text-right">
-                <span className="text-[10px] text-slate-500 block uppercase">Bio-Patch Node</span>
-                <span className="text-cyan-300 font-bold">LOCKED &lt;1ms</span>
-              </div>
-            </div>
-          </div>
-          <div className="pointer-events-none absolute inset-0 bg-[repeating-linear-gradient(0deg,transparent,transparent_2px,rgba(6,182,212,0.02)_2px,rgba(6,182,212,0.02)_4px)]" />
-        </div>
-      </header>
-
+    <div className="w-full space-y-5 animate-fade-in text-[#e4f0fb] font-sans pb-10">
+      
       {/* ─────────────────────────────────────────────────────────
-          AI CARE RECOMMENDATION BANNER
-          (calm, positive, actionable guidance — no alarm badges)
+          FLIGHT SURGEON NOTE BANNER (If Active)
       ───────────────────────────────────────────────────────── */}
-      <section>
-        <div className={`rounded-2xl border bg-gradient-to-r p-4 sm:p-5 backdrop-blur-xl transition-all duration-500 flex flex-col md:flex-row md:items-center justify-between gap-4 ${aiCareRecommendation.theme}`}>
-          <div className="space-y-1">
-            <div className="flex items-center gap-2">
-              <span className="flex items-center gap-1.5 text-[10px] font-mono font-bold px-2 py-0.5 rounded-full border border-cyan-400/25 bg-cyan-500/10 text-cyan-300">
-                <Sparkles className="w-3 h-3" /> {aiCareRecommendation.kicker}
-              </span>
-              <h3 className="text-sm font-black tracking-wide text-white flex items-center gap-1.5">
-                <span className="text-base">{aiCareRecommendation.emoji}</span> {aiCareRecommendation.title}
-              </h3>
-            </div>
-            <p className="text-xs leading-relaxed text-slate-300 max-w-4xl">
-              {aiCareRecommendation.message}
-            </p>
+      {surgeonGuidance.length > 0 && (
+        <div className="rounded-xl border border-[#3ddc97]/40 bg-[#3ddc97]/10 p-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-[0_0_20px_rgba(61,220,151,0.15)]">
+          <div className="flex items-center gap-2 text-xs">
+            <ShieldCheck className="h-4 w-4 text-[#3ddc97] shrink-0" />
+            <span className="font-semibold text-[#3ddc97]">Flight Surgeon Note:</span>
+            <span className="text-[#e4f0fb]">{surgeonGuidance[0].message}</span>
           </div>
-          <div className="shrink-0 flex items-center gap-2">
-            <ShieldCheck className="w-5 h-5 text-cyan-400" />
-            <span className="text-[10px] font-mono text-slate-400">AI Care Guidance · Confidential Wellness Coaching</span>
-          </div>
+          <button
+            type="button"
+            onClick={() => void acknowledgeGuidance(surgeonGuidance[0]._id)}
+            disabled={acknowledgingId === surgeonGuidance[0]._id}
+            className="self-start sm:self-center shrink-0 rounded-lg border border-[#3ddc97]/40 bg-[#3ddc97]/20 px-3 py-1 text-xs font-semibold text-[#3ddc97] hover:bg-[#3ddc97]/30 transition"
+          >
+            {acknowledgingId === surgeonGuidance[0]._id ? "Acknowledging…" : "Acknowledge"}
+          </button>
         </div>
-      </section>
-
-      {/* ─────────────────────────────────────────────────────────
-          FLIGHT SURGEON CALM GUIDANCE
-          (gentle, non-alarm personal note pushed from the
-          Medical Officer dashboard — never a red badge)
-      ───────────────────────────────────────────────────────── */}
-      {guidanceLoaded && surgeonGuidance.length > 0 && (
-        <section>
-          <div className="flex flex-col gap-4 rounded-2xl border border-emerald-400/25 bg-gradient-to-r from-[#062018]/95 via-[#0a141f]/90 to-[#080C14]/95 p-4 shadow-[0_0_30px_rgba(16,185,129,0.1)] backdrop-blur-xl sm:p-5 md:flex-row md:items-center md:justify-between">
-            <div className="space-y-1.5">
-              <div className="flex flex-wrap items-center gap-2">
-                <span className="flex items-center gap-1.5 rounded-full border border-emerald-400/25 bg-emerald-500/10 px-2 py-0.5 font-mono text-[10px] font-bold text-emerald-300">
-                  <ShieldCheck className="w-3 h-3" /> Flight Surgeon Guidance
-                </span>
-                <span className="font-mono text-[10px] text-slate-500">
-                  {surgeonGuidance[0].source === "AI" ? "AI-calibrated · approved by " : "Personal note from "}
-                  {surgeonGuidance[0].doctorName}
-                </span>
-              </div>
-              <h3 className="text-sm font-black tracking-wide text-white">A calm word from your medical team</h3>
-              <p className="max-w-4xl text-xs leading-relaxed text-slate-300">{surgeonGuidance[0].message}</p>
-              {surgeonGuidance.length > 1 && (
-                <p className="text-[10px] text-slate-500">+{surgeonGuidance.length - 1} more guidance note{surgeonGuidance.length > 2 ? "s" : ""}</p>
-              )}
-            </div>
-            <div className="shrink-0">
-              <button
-                onClick={() => void acknowledgeGuidance(surgeonGuidance[0]._id)}
-                disabled={acknowledgingId === surgeonGuidance[0]._id}
-                className="flex items-center gap-1.5 rounded-xl border border-emerald-400/30 bg-emerald-500/15 px-4 py-2.5 text-xs font-bold text-emerald-200 transition hover:bg-emerald-500/25 disabled:opacity-50"
-              >
-                <Check className="w-3.5 h-3.5" />
-                {acknowledgingId === surgeonGuidance[0]._id ? "Acknowledging…" : "Acknowledge & Dismiss"}
-              </button>
-            </div>
-          </div>
-        </section>
       )}
 
       {/* ─────────────────────────────────────────────────────────
-          SECTION 1: BIOMETRIC VITALS GRID (7 KEY PARAMETERS)
+          1. COCKPIT · AUTONOMOUS BIO-MATRIX (TOP ROW)
       ───────────────────────────────────────────────────────── */}
-      <section className="space-y-3">
-        <div className="flex items-center justify-between">
-          <h2 className="text-xs font-black uppercase tracking-[0.2em] text-cyan-400 flex items-center gap-2">
-            <Activity className="w-4 h-4 text-cyan-400" /> 1. Biometric Vitals Stream (7 Live Ingestion Nodes)
-          </h2>
-          <span className="text-[10px] font-mono text-slate-400">Continuous Auto-Sync (3s Pulse)</span>
+      <div className="flex items-center justify-between pt-1">
+        <div className="flex items-center gap-2 text-xs font-mono font-bold tracking-widest text-[#7f96ae] uppercase">
+          <span className="text-[#2ee6f6]">▌</span> Cockpit · Autonomous Bio-Matrix
+        </div>
+        <span className="rounded-full border border-[#1d2f47] bg-[#070d16] px-2.5 py-0.5 text-[10px] font-mono text-[#7f96ae]">
+          {missionInfo.mission.toUpperCase()} · DAY {missionInfo.missionDay}
+        </span>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-12 gap-3.5">
+        
+        {/* Crew Commander Card (4 Cols) */}
+        <div className="md:col-span-4 rounded-xl border border-[#1d2f47] bg-[#0d1726]/90 p-4 flex items-center gap-4 relative overflow-hidden backdrop-blur-md shadow-md">
+          <div className="h-14 w-14 rounded-full flex items-center justify-center font-bold text-sm text-[#070d16] bg-gradient-to-tr from-[#2ee6f6] via-[#3ddc97] to-[#2ee6f6] shadow-[0_0_15px_rgba(46,230,246,0.3)] shrink-0 animate-hue-spin">
+            {astronautInitials}
+          </div>
+          <div className="min-w-0">
+            <div className="text-[11px] text-[#7f96ae] font-mono tracking-wider">CREW COMMANDER</div>
+            <h2 className="text-lg font-bold text-[#e4f0fb] truncate">{astronautName}</h2>
+            <div className="font-mono text-xs text-[#2ee6f6] flex items-center gap-2 mt-0.5">
+              <span>{user?.astronautId || "AST-001"}</span>
+              <span className="text-[10px] text-[#3ddc97] bg-[#3ddc97]/15 px-1.5 py-0.5 rounded font-mono font-bold">
+                EVA READY
+              </span>
+              <button
+                type="button"
+                onClick={() => setProfileModalOpen(true)}
+                className="text-[11px] text-[#7f96ae] hover:text-[#2ee6f6] underline ml-1"
+              >
+                Dossier
+              </button>
+            </div>
+          </div>
         </div>
 
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-7 gap-3">
-          
-          {/* 1. Heart Rate */}
-          <div className="rounded-xl border border-cyan-500/20 bg-[#0a121e]/85 p-3.5 backdrop-blur-md relative">
-            <div className="flex items-center justify-between text-xs mb-1">
-              <span className="flex items-center gap-1 text-[10px] font-bold text-cyan-300 uppercase tracking-wider">
-                <Heart className="w-3 h-3 text-red-400 animate-pulse" /> Heart Rate
-              </span>
+        {/* Bio-Link Gateway Status (3 Cols) */}
+        <div className="md:col-span-3 rounded-xl border border-[#1d2f47] bg-[#0d1726]/90 p-3.5 flex flex-col justify-between font-mono text-xs backdrop-blur-md shadow-md">
+          <div className="flex justify-between items-center py-1 border-b border-dashed border-[#1d2f47]">
+            <div className="flex items-center gap-1.5">
+              <Radio className="h-3.5 w-3.5 text-[#2ee6f6]" />
+              <span className="text-[#7f96ae] font-sans font-semibold">Bio-Link Status</span>
             </div>
-            <div className="text-2xl font-black font-mono text-white tracking-tight">
-              {telemetry.heartRate} <span className="text-xs text-slate-400 font-normal">BPM</span>
-            </div>
-            <p className="text-[9px] text-slate-500 font-mono mt-0.5">Rest: 60-85 BPM</p>
-            <div className="w-full bg-slate-800 h-1 rounded-full mt-2 overflow-hidden">
-              <div className="bg-gradient-to-r from-cyan-400 to-emerald-400 h-full" style={{ width: `${(telemetry.heartRate / 130) * 100}%` }} />
-            </div>
+            <span className="flex items-center gap-1 text-[#3ddc97] font-bold">
+              <span className="h-2 w-2 rounded-full bg-[#3ddc97] shadow-[0_0_6px_#3ddc97] animate-pulse" />
+              CONNECTED
+            </span>
           </div>
-
-          {/* 2. Blood Pressure */}
-          <div className="rounded-xl border border-cyan-500/20 bg-[#0a121e]/85 p-3.5 backdrop-blur-md relative">
-            <div className="flex items-center justify-between text-xs mb-1">
-              <span className="flex items-center gap-1 text-[10px] font-bold text-cyan-300 uppercase tracking-wider">
-                <Activity className="w-3 h-3 text-cyan-400" /> Blood Press.
-              </span>
-            </div>
-            <div className="text-2xl font-black font-mono text-white tracking-tight">
-              {telemetry.bloodPressureSystolic}/{telemetry.bloodPressureDiastolic}
-            </div>
-            <p className="text-[9px] text-slate-500 font-mono mt-0.5">mmHg (Optimal)</p>
-            <div className="w-full bg-slate-800 h-1 rounded-full mt-2 overflow-hidden">
-              <div className="bg-emerald-400 h-full" style={{ width: "85%" }} />
-            </div>
+          <div className="flex justify-between items-center py-1 border-b border-dashed border-[#1d2f47]">
+            <span className="text-[#7f96ae] font-sans">Edge Gateway</span>
+            <span className="text-[#e4f0fb]">BLG-001 (Hab 2)</span>
           </div>
-
-          {/* 3. SpO2 */}
-          <div className="rounded-xl border border-cyan-500/20 bg-[#0a121e]/85 p-3.5 backdrop-blur-md relative">
-            <div className="flex items-center justify-between text-xs mb-1">
-              <span className="flex items-center gap-1 text-[10px] font-bold text-cyan-300 uppercase tracking-wider">
-                <Droplet className="w-3 h-3 text-cyan-400" /> SpO₂ Sat.
-              </span>
-            </div>
-            <div className="text-2xl font-black font-mono text-white tracking-tight">
-              {telemetry.spo2}<span className="text-xs text-cyan-400 font-normal">%</span>
-            </div>
-            <p className="text-[9px] text-slate-500 font-mono mt-0.5">Norm: 95-100%</p>
-            <div className="w-full bg-slate-800 h-1 rounded-full mt-2 overflow-hidden">
-              <div className="bg-cyan-400 h-full" style={{ width: `${telemetry.spo2}%` }} />
-            </div>
+          <div className="flex justify-between items-center py-1 border-b border-dashed border-[#1d2f47]">
+            <span className="text-[#7f96ae] font-sans">Sensors Online</span>
+            <span className="text-[#3ddc97] font-bold">5 / 5 Devices (BLE/USB)</span>
           </div>
-
-          {/* 4. Blood Glucose */}
-          <div className="rounded-xl border border-cyan-500/20 bg-[#0a121e]/85 p-3.5 backdrop-blur-md relative">
-            <div className="flex items-center justify-between text-xs mb-1">
-              <span className="flex items-center gap-1 text-[10px] font-bold text-cyan-300 uppercase tracking-wider">
-                <Flame className="w-3 h-3 text-amber-400" /> Glucose
-              </span>
-            </div>
-            <div className="text-2xl font-black font-mono text-white tracking-tight">
-              {telemetry.bloodGlucose} <span className="text-xs text-slate-400 font-normal">mg/dL</span>
-            </div>
-            <p className="text-[9px] text-slate-500 font-mono mt-0.5">Target: 70-110</p>
-            <div className="w-full bg-slate-800 h-1 rounded-full mt-2 overflow-hidden">
-              <div className="bg-amber-400 h-full" style={{ width: `${(telemetry.bloodGlucose / 140) * 100}%` }} />
-            </div>
+          <div className="flex justify-between items-center py-1">
+            <span className="text-[#7f96ae] font-sans">Last Sync: 3s ago</span>
+            <Link
+              href="/astronaut/bio-link"
+              className="text-[#2ee6f6] hover:underline flex items-center gap-0.5 text-[11px] font-bold font-sans"
+            >
+              <span>Manage</span>
+              <ArrowRight className="h-3 w-3" />
+            </Link>
           </div>
-
-          {/* 5. Weight & BMI */}
-          <div className="rounded-xl border border-cyan-500/20 bg-[#0a121e]/85 p-3.5 backdrop-blur-md relative">
-            <div className="flex items-center justify-between text-xs mb-1">
-              <span className="flex items-center gap-1 text-[10px] font-bold text-cyan-300 uppercase tracking-wider">
-                <Scale className="w-3 h-3 text-purple-400" /> Weight &amp; BMI
-              </span>
-            </div>
-            <div className="text-2xl font-black font-mono text-white tracking-tight">
-              {telemetry.bodyWeightKg}<span className="text-xs text-slate-400 font-normal">kg</span>
-            </div>
-            <p className="text-[9px] text-purple-300 font-mono mt-0.5">BMI: {telemetry.bmi} kg/m²</p>
-            <div className="w-full bg-slate-800 h-1 rounded-full mt-2 overflow-hidden">
-              <div className="bg-purple-400 h-full" style={{ width: "75%" }} />
-            </div>
-          </div>
-
-          {/* 6. Sleep Quality */}
-          <div className="rounded-xl border border-cyan-500/20 bg-[#0a121e]/85 p-3.5 backdrop-blur-md relative">
-            <div className="flex items-center justify-between text-xs mb-1">
-              <span className="flex items-center gap-1 text-[10px] font-bold text-cyan-300 uppercase tracking-wider">
-                <Moon className="w-3 h-3 text-indigo-400" /> Sleep Rest
-              </span>
-            </div>
-            <div className="text-2xl font-black font-mono text-white tracking-tight">
-              {telemetry.sleepHours}<span className="text-xs text-slate-400 font-normal">h</span>
-            </div>
-            <p className="text-[9px] text-indigo-300 font-mono mt-0.5">Score: {telemetry.sleepQualityScore}/100</p>
-            <div className="w-full bg-slate-800 h-1 rounded-full mt-2 overflow-hidden">
-              <div className="bg-indigo-400 h-full" style={{ width: `${telemetry.sleepQualityScore}%` }} />
-            </div>
-          </div>
-
-          {/* 7. Physical Activity */}
-          <div className="rounded-xl border border-cyan-500/20 bg-[#0a121e]/85 p-3.5 backdrop-blur-md relative col-span-2 sm:col-span-1">
-            <div className="flex items-center justify-between text-xs mb-1">
-              <span className="flex items-center gap-1 text-[10px] font-bold text-cyan-300 uppercase tracking-wider">
-                <Dumbbell className="w-3 h-3 text-emerald-400" /> Activity
-              </span>
-            </div>
-            <div className="text-2xl font-black font-mono text-white tracking-tight">
-              {telemetry.activeSteps.toLocaleString()}
-            </div>
-            <p className="text-[9px] text-emerald-300 font-mono mt-0.5">{telemetry.activeCaloriesBurned} kcal · {telemetry.activeWorkoutMinutes}m</p>
-            <div className="w-full bg-slate-800 h-1 rounded-full mt-2 overflow-hidden">
-              <div className="bg-emerald-400 h-full" style={{ width: "84%" }} />
-            </div>
-          </div>
-
         </div>
-      </section>
 
-      {/* ─────────────────────────────────────────────────────────
-          SECTION 2: MACRO & METABOLIC HUD (CALORIES, PROTEIN, FATS, FIBER, WATER)
-      ───────────────────────────────────────────────────────── */}
-      <section className="rounded-2xl border border-cyan-500/20 bg-gradient-to-br from-[#061826]/90 via-[#0a101d]/90 to-[#070b14]/90 p-5 shadow-[0_0_35px_rgba(6,182,212,0.06)] backdrop-blur-xl space-y-4">
-        <div className="flex items-center justify-between border-b border-slate-800/80 pb-3">
+        {/* AI Care Recommendation (5 Cols) */}
+        <div className="md:col-span-5 rounded-xl border border-[#2ee6f6]/40 bg-gradient-to-br from-[#2ee6f6]/10 via-[#0d1726] to-[#0d1726] p-4 flex flex-col justify-between backdrop-blur-md shadow-[0_0_25px_rgba(46,230,246,0.1)]">
           <div>
-            <h2 className="text-sm font-black text-white uppercase tracking-wider flex items-center gap-2">
-              <Cpu className="w-4 h-4 text-cyan-400" /> 2. Macro &amp; Metabolic Energy HUD (Target vs Consumed)
-            </h2>
-            <p className="text-[11px] text-slate-400 mt-0.5">
-              Live consumption updated instantly upon RFID packet scanning
+            <span className="rounded-full border border-[#2ee6f6]/30 bg-[#2ee6f6]/15 px-2.5 py-0.5 text-[10px] font-mono font-bold text-[#2ee6f6]">
+              AI CARE RECOMMENDATION
+            </span>
+            <h3 className="text-sm font-bold text-[#e4f0fb] mt-2 flex items-center gap-1.5">
+              <span>💧</span>
+              <span>{macroState.water >= MACRO_TARGETS.water ? "Hydration Target Reached" : "Enjoy a Hydration & Electrolyte Mix Pack"}</span>
+            </h3>
+            <p className="text-xs text-[#7f96ae] mt-1 leading-relaxed">
+              {macroState.water >= MACRO_TARGETS.water
+                ? "Hydration target reached — great work. Next: close your Vitamin D3 gap."
+                : `A hydration top-up will feel great right now — you're at ${macroState.water.toFixed(2)}L for the day. Your body will thank you at the next sync.`}
             </p>
           </div>
-          <span className="text-[10px] font-mono px-2 py-0.5 rounded border border-cyan-500/30 text-cyan-300 bg-cyan-500/10">
-            24h AI Prescription
-          </span>
+          <div className="flex items-center justify-between text-[11px] text-[#7f96ae] pt-2 border-t border-[#1d2f47]/50 mt-2 font-mono">
+            <span>14 parameters streamed autonomously</span>
+            <button
+              type="button"
+              onClick={() => setQuickMessageOpen(true)}
+              className="text-[#2ee6f6] hover:underline font-semibold flex items-center gap-1"
+            >
+              Message Surgeon <ArrowRight className="h-3 w-3" />
+            </button>
+          </div>
         </div>
-
-        {/* 5 Macro Progress Bars */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
-          
-          {/* 8. Protein */}
-          <div className="space-y-1.5 rounded-xl border border-slate-800 bg-slate-900/40 p-3.5">
-            <div className="flex justify-between text-xs font-mono">
-              <span className="text-purple-300 font-bold flex items-center gap-1.5">
-                <span className="h-2 w-2 rounded-full bg-purple-400" /> 8. Protein
-              </span>
-              <span className="text-white font-bold">{intake.macros.proteinG} / {TARGETS.macros.proteinG}g</span>
-            </div>
-            <div className="w-full bg-slate-800 h-2 rounded-full overflow-hidden">
-              <div className="h-full bg-gradient-to-r from-purple-600 to-purple-400 transition-all duration-700" style={{ width: `${Math.min(100, (intake.macros.proteinG / TARGETS.macros.proteinG) * 100)}%` }} />
-            </div>
-            <p className="text-[9px] text-slate-500 font-mono">Muscle Recovery &amp; Sarcopenia Shield</p>
-          </div>
-
-          {/* 9. Healthy Fats */}
-          <div className="space-y-1.5 rounded-xl border border-slate-800 bg-slate-900/40 p-3.5">
-            <div className="flex justify-between text-xs font-mono">
-              <span className="text-amber-300 font-bold flex items-center gap-1.5">
-                <span className="h-2 w-2 rounded-full bg-amber-400" /> 9. Healthy Fats
-              </span>
-              <span className="text-white font-bold">{intake.macros.healthyFatsG} / {TARGETS.macros.healthyFatsG}g</span>
-            </div>
-            <div className="w-full bg-slate-800 h-2 rounded-full overflow-hidden">
-              <div className="h-full bg-gradient-to-r from-amber-600 to-amber-400 transition-all duration-700" style={{ width: `${Math.min(100, (intake.macros.healthyFatsG / TARGETS.macros.healthyFatsG) * 100)}%` }} />
-            </div>
-            <p className="text-[9px] text-slate-500 font-mono">Lipid Balance &amp; Omega-3 Synthesis</p>
-          </div>
-
-          {/* 10. Calories / Energy */}
-          <div className="space-y-1.5 rounded-xl border border-slate-800 bg-slate-900/40 p-3.5">
-            <div className="flex justify-between text-xs font-mono">
-              <span className="text-red-300 font-bold flex items-center gap-1.5">
-                <span className="h-2 w-2 rounded-full bg-red-400" /> 10. Energy (kcal)
-              </span>
-              <span className="text-white font-bold">{intake.macros.caloriesKcal} / {TARGETS.macros.caloriesKcal}</span>
-            </div>
-            <div className="w-full bg-slate-800 h-2 rounded-full overflow-hidden">
-              <div className="h-full bg-gradient-to-r from-red-500 to-orange-400 transition-all duration-700" style={{ width: `${Math.min(100, (intake.macros.caloriesKcal / TARGETS.macros.caloriesKcal) * 100)}%` }} />
-            </div>
-            <p className="text-[9px] text-slate-500 font-mono">Basal Metabolic Energy Reserve</p>
-          </div>
-
-          {/* 11. Dietary Fiber */}
-          <div className="space-y-1.5 rounded-xl border border-slate-800 bg-slate-900/40 p-3.5">
-            <div className="flex justify-between text-xs font-mono">
-              <span className="text-emerald-300 font-bold flex items-center gap-1.5">
-                <span className="h-2 w-2 rounded-full bg-emerald-400" /> 11. Fiber
-              </span>
-              <span className="text-white font-bold">{intake.macros.fiberG} / {TARGETS.macros.fiberG}g</span>
-            </div>
-            <div className="w-full bg-slate-800 h-2 rounded-full overflow-hidden">
-              <div className="h-full bg-gradient-to-r from-emerald-600 to-emerald-400 transition-all duration-700" style={{ width: `${Math.min(100, (intake.macros.fiberG / TARGETS.macros.fiberG) * 100)}%` }} />
-            </div>
-            <p className="text-[9px] text-slate-500 font-mono">Microbiome Health &amp; Motility</p>
-          </div>
-
-          {/* 12. Water / Hydration Status */}
-          <div className="space-y-1.5 rounded-xl border border-slate-800 bg-slate-900/40 p-3.5">
-            <div className="flex justify-between text-xs font-mono">
-              <span className="text-cyan-300 font-bold flex items-center gap-1.5">
-                <span className="h-2 w-2 rounded-full bg-cyan-400" /> 12. Water (L)
-              </span>
-              <span className="text-white font-bold">{intake.macros.hydrationL.toFixed(2)} / {TARGETS.macros.hydrationL}L</span>
-            </div>
-            <div className="w-full bg-slate-800 h-2 rounded-full overflow-hidden">
-              <div className="h-full bg-gradient-to-r from-cyan-600 to-cyan-400 transition-all duration-700" style={{ width: `${Math.min(100, (intake.macros.hydrationL / TARGETS.macros.hydrationL) * 100)}%` }} />
-            </div>
-            <p className="text-[9px] text-cyan-400 font-mono">Tissue Hydration Index: {telemetry.hydrationTissuePct}%</p>
-          </div>
-
-        </div>
-      </section>
-
-      {/* ─────────────────────────────────────────────────────────
-          SECTION 3: MICRO-NUTRIENT MATRIX (VITAMINS & ESSENTIAL MINERALS)
-      ───────────────────────────────────────────────────────── */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-        
-        {/* 13. Key Vitamins (6 cols) */}
-        <section className="lg:col-span-6 rounded-2xl border border-emerald-500/20 bg-gradient-to-br from-[#06181f]/90 via-[#0a1218]/90 to-[#070d14]/90 p-5 shadow-[0_0_35px_rgba(16,185,129,0.06)] backdrop-blur-xl space-y-3">
-          <div className="flex items-center justify-between border-b border-slate-800/80 pb-3">
-            <h3 className="text-xs font-black uppercase tracking-wider text-emerald-400 flex items-center gap-2">
-              <Apple className="w-4 h-4 text-emerald-400" /> 13. Key Vitamins Status (A, B-Complex, C, D3, E, K)
-            </h3>
-            <span className="text-[9px] font-mono text-slate-400">Micro-Array Assay</span>
-          </div>
-
-          <div className="grid grid-cols-3 gap-2.5 font-mono text-xs">
-            <div className="p-2.5 rounded-xl border border-slate-800 bg-slate-900/50 text-center">
-              <span className="text-[9px] text-slate-400 block uppercase">Vitamin A</span>
-              <span className="font-bold text-white text-xs">{intake.vitamins.vitaminA_IU} IU</span>
-              <span className="text-[9px] block text-emerald-400 mt-0.5">NOMINAL</span>
-            </div>
-            <div className="p-2.5 rounded-xl border border-slate-800 bg-slate-900/50 text-center">
-              <span className="text-[9px] text-slate-400 block uppercase">B-Complex</span>
-              <span className="font-bold text-white text-xs">{intake.vitamins.vitaminB_Complex_mg} mg</span>
-              <span className="text-[9px] block text-cyan-400 mt-0.5">ACTIVE</span>
-            </div>
-            <div className="p-2.5 rounded-xl border border-slate-800 bg-slate-900/50 text-center">
-              <span className="text-[9px] text-slate-400 block uppercase">Vitamin C</span>
-              <span className="font-bold text-white text-xs">{intake.vitamins.vitaminC_mg} mg</span>
-              <span className="text-[9px] block text-emerald-400 mt-0.5">OPTIMAL</span>
-            </div>
-            <div className="p-2.5 rounded-xl border border-slate-800 bg-slate-900/50 text-center">
-              <span className="text-[9px] text-slate-400 block uppercase">Vitamin D3</span>
-              <span className="font-bold text-white text-xs">{intake.vitamins.vitaminD3_IU} IU</span>
-              <span className="text-[9px] block text-amber-400 mt-0.5">DEFICIT</span>
-            </div>
-            <div className="p-2.5 rounded-xl border border-slate-800 bg-slate-900/50 text-center">
-              <span className="text-[9px] text-slate-400 block uppercase">Vitamin E</span>
-              <span className="font-bold text-white text-xs">{intake.vitamins.vitaminE_mg} mg</span>
-              <span className="text-[9px] block text-emerald-400 mt-0.5">STABLE</span>
-            </div>
-            <div className="p-2.5 rounded-xl border border-slate-800 bg-slate-900/50 text-center">
-              <span className="text-[9px] text-slate-400 block uppercase">Vitamin K</span>
-              <span className="font-bold text-white text-xs">{intake.vitamins.vitaminK_mcg} mcg</span>
-              <span className="text-[9px] block text-emerald-400 mt-0.5">NOMINAL</span>
-            </div>
-          </div>
-        </section>
-
-        {/* 14. Essential Minerals (6 cols) */}
-        <section className="lg:col-span-6 rounded-2xl border border-purple-500/20 bg-gradient-to-br from-[#120b22]/90 via-[#0c0d1c]/90 to-[#070b14]/90 p-5 shadow-[0_0_35px_rgba(168,85,247,0.06)] backdrop-blur-xl space-y-3">
-          <div className="flex items-center justify-between border-b border-slate-800/80 pb-3">
-            <h3 className="text-xs font-black uppercase tracking-wider text-purple-400 flex items-center gap-2">
-              <Pill className="w-4 h-4 text-purple-400" /> 14. Essential Minerals (Fe, Ca, Mg, Zn, K)
-            </h3>
-            <span className="text-[9px] font-mono text-slate-400">Electrolyte Matrix</span>
-          </div>
-
-          <div className="grid grid-cols-2 sm:grid-cols-5 gap-2.5 font-mono text-xs">
-            <div className="p-2.5 rounded-xl border border-slate-800 bg-slate-900/50 text-center">
-              <span className="text-[9px] text-slate-400 block uppercase">Iron (Fe)</span>
-              <span className="font-bold text-white text-xs">{intake.minerals.iron_mg} mg</span>
-              <span className="text-[9px] block text-emerald-400 mt-0.5">OK</span>
-            </div>
-            <div className="p-2.5 rounded-xl border border-slate-800 bg-slate-900/50 text-center">
-              <span className="text-[9px] text-slate-400 block uppercase">Calcium</span>
-              <span className="font-bold text-white text-xs">{intake.minerals.calcium_mg} mg</span>
-              <span className="text-[9px] block text-amber-400 mt-0.5">WATCH</span>
-            </div>
-            <div className="p-2.5 rounded-xl border border-slate-800 bg-slate-900/50 text-center">
-              <span className="text-[9px] text-slate-400 block uppercase">Magnesium</span>
-              <span className="font-bold text-white text-xs">{intake.minerals.magnesium_mg} mg</span>
-              <span className="text-[9px] block text-cyan-400 mt-0.5">NOMINAL</span>
-            </div>
-            <div className="p-2.5 rounded-xl border border-slate-800 bg-slate-900/50 text-center">
-              <span className="text-[9px] text-slate-400 block uppercase">Zinc (Zn)</span>
-              <span className="font-bold text-white text-xs">{intake.minerals.zinc_mg} mg</span>
-              <span className="text-[9px] block text-emerald-400 mt-0.5">OK</span>
-            </div>
-            <div className="p-2.5 rounded-xl border border-slate-800 bg-slate-900/50 text-center col-span-2 sm:col-span-1">
-              <span className="text-[9px] text-slate-400 block uppercase">Potassium</span>
-              <span className="font-bold text-white text-xs">{intake.minerals.potassium_mg} mg</span>
-              <span className="text-[9px] block text-emerald-400 mt-0.5">OPTIMAL</span>
-            </div>
-          </div>
-        </section>
 
       </div>
 
       {/* ─────────────────────────────────────────────────────────
-          SECTION 4: SIMULATED RFID MEAL & SUPPLEMENT SCANNER
+          2. LIVE ECG & MISSION READINESS GAUGE
       ───────────────────────────────────────────────────────── */}
-      <section className="rounded-2xl border border-cyan-500/30 bg-gradient-to-br from-[#081525]/90 via-[#0a0f1c]/90 to-[#060c14]/90 p-5 shadow-[0_0_40px_rgba(6,182,212,0.08)] backdrop-blur-xl space-y-4">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-800/80 pb-3.5">
-          <div>
-            <h2 className="text-sm font-black text-white uppercase tracking-wider flex items-center gap-2">
-              <ScanLine className="w-4 h-4 text-cyan-400" /> 4. Simulated RFID Space-Meal Scanner (Zero Manual Typing)
-            </h2>
-            <p className="text-[11px] text-slate-400 mt-0.5">
-              1-Click Optical / RFID simulation · Dynamically updates all 14 biometric and nutrient parameters
-            </p>
-          </div>
-          <span className="text-[10px] font-mono px-2.5 py-1 rounded-full border border-cyan-500/40 text-cyan-300 bg-cyan-500/10 font-bold">
-            {intake.scannedPacksCount} Packs Scanned Today
-          </span>
-        </div>
-
-        {/* 4 Interactive RFID Pack Scan Buttons */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
-          {RFID_SPACE_PACKS.map((pack) => {
-            const isScanning = scanningPackId === pack.id;
-            return (
-              <button
-                key={pack.id}
-                onClick={() => handleRFIDScan(pack)}
-                disabled={!!scanningPackId}
-                className={`group relative text-left rounded-xl border p-4 transition-all duration-300 overflow-hidden ${
-                  isScanning
-                    ? "border-cyan-400 bg-cyan-950/40 shadow-[0_0_24px_rgba(6,182,212,0.5)] scale-[0.98]"
-                    : "border-slate-800/90 bg-slate-900/40 hover:border-cyan-500/50 hover:bg-cyan-950/20 hover:shadow-[0_0_20px_rgba(6,182,212,0.1)]"
-                }`}
-              >
-                {/* Laser scanline animation */}
-                {isScanning && (
-                  <div className="absolute inset-0 pointer-events-none overflow-hidden">
-                    <div className="absolute left-0 right-0 h-0.5 bg-cyan-400 animate-pulse top-1/2 -translate-y-1/2 shadow-[0_0_14px_#22d3ee]" />
-                  </div>
-                )}
-
-                <div className="flex items-start gap-3">
-                  <span className="text-3xl p-2 rounded-xl bg-slate-800/60 shrink-0">{pack.emoji}</span>
-                  <div className="flex-1 min-w-0">
-                    <p className={`text-xs font-bold leading-tight ${isScanning ? "text-cyan-300" : "text-white group-hover:text-cyan-200"}`}>
-                      {pack.name}
-                    </p>
-                    <span className="text-[8px] font-mono text-slate-500 block mt-0.5">{pack.id}</span>
-                  </div>
-                </div>
-
-                <div className="mt-3 pt-2.5 border-t border-slate-800/80 flex items-center justify-between font-mono text-[9px]">
-                  <span className="text-slate-400">Auto Ingest:</span>
-                  <span className="text-cyan-300 font-bold group-hover:text-cyan-200">
-                    {isScanning ? "SCANNING..." : "TRIGGER RFID"}
-                  </span>
-                </div>
-              </button>
-            );
-          })}
-        </div>
-
-        {/* Scan Feedback Confirmation Toast */}
-        {scanCelebration && (
-          <div className="rounded-xl border border-emerald-500/40 bg-emerald-950/30 p-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs font-mono text-emerald-300">
-            <div className="flex items-center gap-2.5">
-              <CheckCircle2 className="w-5 h-5 text-emerald-400 shrink-0" />
-              <span>
-                RFID Verified: <strong>{scanCelebration.packName}</strong> ({scanCelebration.highlights.join(" · ")})
-              </span>
-            </div>
-            <span className="text-[9px] uppercase font-bold text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/30">
-              14 Parameters Re-Synced
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-3.5">
+        
+        {/* Live ECG Waveform (8 Cols) */}
+        <div className="lg:col-span-8 rounded-xl border border-[#1d2f47] bg-[#0d1726]/90 p-4 backdrop-blur-md shadow-md flex flex-col justify-between">
+          <div className="flex items-center justify-between mb-2">
+            <span className="rounded-full border border-[#1d2f47] bg-[#070d16] px-2.5 py-0.5 text-[10px] font-mono text-[#7f96ae]">
+              LIVE ECG · LEAD II
+            </span>
+            <span className="font-mono text-xs font-bold text-[#3ddc97] flex items-center gap-1">
+              ♥ <span className="text-base">{liveHr}</span> BPM
             </span>
           </div>
-        )}
-      </section>
+
+          <div className="h-24 w-full rounded-lg overflow-hidden relative bg-[repeating-linear-gradient(90deg,#1d2f47_0_1px,transparent_1px_24px),repeating-linear-gradient(0deg,#1d2f47_0_1px,transparent_1px_22px)] flex items-center">
+            <div className="absolute inset-0 bg-gradient-to-r from-[#0d1726] via-transparent to-[#0d1726] pointer-events-none z-10" />
+            <svg viewBox="0 0 960 100" preserveAspectRatio="none" className="w-[200%] h-full animate-ecg-wave drop-shadow-[0_0_6px_#3ddc97]">
+              <path
+                d="M0,60 L20,60 L26,56 L32,60 L44,60 L48,72 L54,12 L60,88 L64,60 L84,60 L92,46 L100,60 L120,60 L126,56 L132,60 L144,60 L148,72 L154,12 L160,88 L164,60 L184,60 L192,46 L200,60 L220,60 L226,56 L232,60 L244,60 L248,72 L254,12 L260,88 L264,60 L284,60 L292,46 L300,60 L320,60 L326,56 L332,60 L344,60 L348,72 L354,12 L360,88 L364,60 L384,60 L392,46 L400,60 L420,60 L426,56 L432,60 L444,60 L448,72 L454,12 L460,88 L464,60 L484,60 L492,46 L500,60 L520,60 L526,56 L532,60 L544,60 L548,72 L554,12 L560,88 L564,60 L584,60 L592,46 L600,60 L620,60 L626,56 L632,60 L644,60 L648,72 L654,12 L660,88 L664,60 L684,60 L692,46 L700,60 L720,60 L726,56 L732,60 L744,60 L748,72 L754,12 L760,88 L764,60 L784,60 L792,46 L800,60 L820,60 L826,56 L832,60 L844,60 L848,72 L854,12 L860,88 L864,60 L884,60 L892,46 L900,60 L920,60 L926,56 L932,60 L944,60 L948,72 L954,12 L960,88"
+                fill="none"
+                stroke="#3ddc97"
+                strokeWidth="2.2"
+                vectorEffect="non-scaling-stroke"
+              />
+            </svg>
+          </div>
+        </div>
+
+        {/* Mission Readiness Gauge (4 Cols) */}
+        <div className="lg:col-span-4 rounded-xl border border-[#1d2f47] bg-[#0d1726]/90 p-4 backdrop-blur-md shadow-md flex flex-col items-center justify-center text-center">
+          <span className="rounded-full border border-[#1d2f47] bg-[#070d16] px-2.5 py-0.5 text-[10px] font-mono text-[#7f96ae] mb-2">
+            MISSION READINESS
+          </span>
+
+          <div className="relative w-44">
+            <svg viewBox="0 0 140 84" className="w-full">
+              <defs>
+                <linearGradient id="hudGauge" x1="0" y1="0" x2="1" y2="0">
+                  <stop offset="0%" stopColor="#ffb547" />
+                  <stop offset="100%" stopColor="#3ddc97" />
+                </linearGradient>
+              </defs>
+              <path d="M10 74 A60 60 0 0 1 130 74" fill="none" stroke="#1d2f47" strokeWidth="11" strokeLinecap="round" />
+              <path
+                d="M10 74 A60 60 0 0 1 130 74"
+                fill="none"
+                stroke="url(#hudGauge)"
+                strokeWidth="11"
+                strokeLinecap="round"
+                strokeDasharray="173 189"
+                style={{ filter: "drop-shadow(0 0 6px #3ddc97)" }}
+              />
+              <text x="70" y="66" textAnchor="middle" fill="#e4f0fb" fontSize="28" fontWeight="700">
+                92
+              </text>
+            </svg>
+          </div>
+          <div className="text-[11px] font-mono text-[#7f96ae] mt-1">
+            Sleep 92 · SpO₂ {liveSpo2}% · Anomaly 0.14
+          </div>
+        </div>
+
+      </div>
+
+      {/* ─────────────────────────────────────────────────────────
+          3. BIOMETRIC VITALS STREAM (7 CARDS)
+      ───────────────────────────────────────────────────────── */}
+      <div className="flex items-center justify-between pt-1">
+        <div className="flex items-center gap-2 text-xs font-mono font-bold tracking-widest text-[#7f96ae] uppercase">
+          <span className="text-[#2ee6f6]">01</span> Biometric Vitals Stream
+        </div>
+        <span className="rounded-full border border-[#1d2f47] bg-[#070d16] px-2.5 py-0.5 text-[10px] font-mono text-[#7f96ae]">
+          auto-sync · 2.5s pulse
+        </span>
+      </div>
+
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-7 gap-3">
+        {vitalsData.map((v) => (
+          <div
+            key={v.label}
+            className="rounded-xl border border-[#1d2f47] bg-[#0d1726]/90 p-3 flex flex-col justify-between transition-all hover:-translate-y-1 hover:border-[#2ee6f6] hover:shadow-[0_8px_25px_-8px_rgba(46,230,246,0.3)] backdrop-blur-md"
+          >
+            <div>
+              <div className="flex items-center justify-between gap-1">
+                <span className="text-[10px] font-mono uppercase tracking-wider text-[#7f96ae] truncate">{v.label}</span>
+                <span
+                  className={`text-[8.5px] font-mono font-bold px-1.5 py-0.2 rounded border shrink-0 ${
+                    v.sourceType === "live"
+                      ? "border-[#3ddc97]/40 bg-[#3ddc97]/15 text-[#3ddc97]"
+                      : v.sourceType === "derived"
+                      ? "border-[#a98bff]/40 bg-[#a98bff]/15 text-[#a98bff]"
+                      : v.sourceType === "device"
+                      ? "border-[#2ee6f6]/40 bg-[#2ee6f6]/15 text-[#2ee6f6]"
+                      : "border-[#7f96ae]/40 bg-[#7f96ae]/15 text-[#7f96ae]"
+                  }`}
+                >
+                  {v.sourceTag}
+                </span>
+              </div>
+              <div className="font-mono text-2xl font-bold bg-gradient-to-b from-[#e4f0fb] to-[#2ee6f6] bg-clip-text text-transparent mt-1">
+                {v.val} <small className="text-[10px] text-[#7f96ae] font-medium">{v.unit}</small>
+              </div>
+              <div className={`text-[10px] font-medium mt-0.5 ${v.color}`}>{v.status}</div>
+            </div>
+            {generateSparkline(v.seed)}
+          </div>
+        ))}
+      </div>
+
+      {/* ─────────────────────────────────────────────────────────
+          4. BODY SCAN · NUTRIENT RADAR · ORGAN TELEMETRY
+      ───────────────────────────────────────────────────────── */}
+      <div className="flex items-center gap-2 text-xs font-mono font-bold tracking-widest text-[#7f96ae] uppercase pt-2">
+        <span className="text-[#2ee6f6]">◉</span> Body Scan · Radar · 24h Timeline
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-12 gap-3.5">
+        
+        {/* Body Bio-Scan Silhouette with animated laser scan & pulsing organs (3 Cols) */}
+        <div className="md:col-span-3 rounded-xl border border-[#1d2f47] bg-[#0d1726]/90 p-4 relative overflow-hidden flex flex-col items-center justify-center min-h-[310px] backdrop-blur-md shadow-md">
+          <span className="rounded-full border border-[#1d2f47] bg-[#070d16] px-2 py-0.5 text-[10px] font-mono text-[#7f96ae] absolute top-3 left-3">
+            BIO-SCAN
+          </span>
+
+          {/* Animated Laser Scan Beam */}
+          <div className="absolute left-0 right-0 h-8 bg-gradient-to-b from-transparent via-[#2ee6f6]/25 to-transparent border-y border-[#2ee6f6]/50 pointer-events-none animate-body-scan z-10" />
+
+          <svg viewBox="0 0 120 260" className="w-32 h-60 overflow-visible relative">
+            <g className="fill-[#2ee6f6]/10 stroke-[#2ee6f6] stroke-[1.2] stroke-opacity-70">
+              <circle cx="60" cy="24" r="16" />
+              <path d="M42 48 Q60 42 78 48 L96 62 L100 120 L90 122 L84 80 L82 140 L84 250 L68 250 L62 150 L58 150 L52 250 L36 250 L38 140 L36 80 L30 122 L20 120 L24 62Z" />
+            </g>
+            {/* Brain Pulse */}
+            <g fill="#3ddc97">
+              <circle cx="60" cy="22" r="3" />
+              <circle cx="60" cy="22" r="3" className="animate-organ-pulse origin-center" />
+            </g>
+            {/* Heart Pulse */}
+            <g fill="#ff5468">
+              <circle cx="67" cy="80" r="3.5" />
+              <circle cx="67" cy="80" r="3.5" className="animate-organ-pulse origin-center" />
+            </g>
+            {/* Lungs Pulse */}
+            <g fill="#2ee6f6">
+              <circle cx="52" cy="72" r="3" />
+              <circle cx="70" cy="68" r="3" />
+              <circle cx="52" cy="72" r="3" className="animate-organ-pulse origin-center" />
+            </g>
+            {/* Gut Pulse */}
+            <g fill="#ffb547">
+              <circle cx="60" cy="118" r="3.5" />
+              <circle cx="60" cy="118" r="3.5" className="animate-organ-pulse origin-center" />
+            </g>
+            {/* Limbs / Joints */}
+            <g fill="#3ddc97">
+              <circle cx="30" cy="96" r="3" />
+              <circle cx="90" cy="96" r="3" />
+            </g>
+          </svg>
+        </div>
+
+        {/* Nutrient Coverage Radar (4 Cols) */}
+        <div className="md:col-span-4 rounded-xl border border-[#1d2f47] bg-[#0d1726]/90 p-4 flex flex-col justify-between backdrop-blur-md shadow-md">
+          <span className="rounded-full border border-[#1d2f47] bg-[#070d16] px-2.5 py-0.5 text-[10px] font-mono text-[#7f96ae] self-start">
+            NUTRIENT COVERAGE RADAR
+          </span>
+
+          <svg viewBox="0 0 260 240" className="w-full mt-2">
+            {[0.25, 0.5, 0.75, 1].map((g) => (
+              <polygon
+                key={g}
+                points={radarPoints.axes.map((_, i) => radarPoints.getCoord(i, radarPoints.R * g).join(",")).join(" ")}
+                fill="none"
+                stroke="#1d2f47"
+              />
+            ))}
+            {radarPoints.axes.map((a, i) => {
+              const [x, y] = radarPoints.getCoord(i, radarPoints.R);
+              const [lx, ly] = radarPoints.getCoord(i, radarPoints.R + 16);
+              return (
+                <g key={a.name}>
+                  <line x1={radarPoints.cx} y1={radarPoints.cy} x2={x} y2={y} stroke="#1d2f47" />
+                  <text x={lx} y={ly + 3} textAnchor="middle" fontSize="9.5" fill="#7f96ae" className="font-mono">
+                    {a.name}
+                  </text>
+                </g>
+              );
+            })}
+            <polygon
+              points={radarPoints.pts}
+              fill="#2ee6f6"
+              fillOpacity="0.22"
+              stroke="#2ee6f6"
+              strokeWidth="2"
+              style={{ filter: "drop-shadow(0 0 6px #2ee6f6)" }}
+            />
+            {radarPoints.dataCoords.map(([x, y], i) => (
+              <circle key={i} cx={x} cy={y} r="3" fill="#2ee6f6" />
+            ))}
+          </svg>
+        </div>
+
+        {/* Organ Telemetry List (5 Cols) */}
+        <div className="md:col-span-5 rounded-xl border border-[#1d2f47] bg-[#0d1726]/90 p-4 flex flex-col justify-between backdrop-blur-md shadow-md">
+          <span className="rounded-full border border-[#1d2f47] bg-[#070d16] px-2.5 py-0.5 text-[10px] font-mono text-[#7f96ae] self-start mb-1">
+            ORGAN TELEMETRY
+          </span>
+
+          <div className="space-y-1 divide-y divide-dashed divide-[#1d2f47] text-xs">
+            
+            <div className="flex items-center gap-2.5 py-1.5">
+              <div className="h-8 w-8 rounded-lg bg-[#2ee6f6]/10 border border-[#1d2f47] flex items-center justify-center text-sm shrink-0">
+                🧠
+              </div>
+              <div className="flex-1 min-w-0">
+                <span className="text-[#7f96ae] block text-[11px]">Neuro / Sleep</span>
+                <b className="text-[#e4f0fb] font-mono text-xs">Score 92 · Stable</b>
+              </div>
+              <span className="rounded-full px-2 py-0.5 text-[10px] font-mono font-bold bg-[#3ddc97]/15 text-[#3ddc97]">
+                OK
+              </span>
+            </div>
+
+            <div className="flex items-center gap-2.5 py-1.5">
+              <div className="h-8 w-8 rounded-lg bg-[#2ee6f6]/10 border border-[#1d2f47] flex items-center justify-center text-sm shrink-0">
+                🫁
+              </div>
+              <div className="flex-1 min-w-0">
+                <span className="text-[#7f96ae] block text-[11px]">Respiratory</span>
+                <b className="text-[#e4f0fb] font-mono text-xs">SpO₂ {liveSpo2}%</b>
+              </div>
+              <span className="rounded-full px-2 py-0.5 text-[10px] font-mono font-bold bg-[#3ddc97]/15 text-[#3ddc97]">
+                OK
+              </span>
+            </div>
+
+            <div className="flex items-center gap-2.5 py-1.5">
+              <div className="h-8 w-8 rounded-lg bg-[#2ee6f6]/10 border border-[#1d2f47] flex items-center justify-center text-sm shrink-0">
+                ❤️
+              </div>
+              <div className="flex-1 min-w-0">
+                <span className="text-[#7f96ae] block text-[11px]">Cardiac</span>
+                <b className="text-[#e4f0fb] font-mono text-xs">118/78 · {liveHr} BPM</b>
+              </div>
+              <span className="rounded-full px-2 py-0.5 text-[10px] font-mono font-bold bg-[#3ddc97]/15 text-[#3ddc97]">
+                OPTIMAL
+              </span>
+            </div>
+
+            <div className="flex items-center gap-2.5 py-1.5">
+              <div className="h-8 w-8 rounded-lg bg-[#2ee6f6]/10 border border-[#1d2f47] flex items-center justify-center text-sm shrink-0">
+                🍽️
+              </div>
+              <div className="flex-1 min-w-0">
+                <span className="text-[#7f96ae] block text-[11px]">Metabolic / Gut</span>
+                <b className="text-[#e4f0fb] font-mono text-xs">Glucose 94 · Fiber {pct(macroState.fiber, MACRO_TARGETS.fiber)}%</b>
+              </div>
+              <span className="rounded-full px-2 py-0.5 text-[10px] font-mono font-bold bg-[#ffb547]/15 text-[#ffb547]">
+                WATCH
+              </span>
+            </div>
+
+            <div className="flex items-center gap-2.5 py-1.5">
+              <div className="h-8 w-8 rounded-lg bg-[#2ee6f6]/10 border border-[#1d2f47] flex items-center justify-center text-sm shrink-0">
+                💪
+              </div>
+              <div className="flex-1 min-w-0">
+                <span className="text-[#7f96ae] block text-[11px]">Muscle Recovery</span>
+                <b className="text-[#e4f0fb] font-mono text-xs">Protein {pct(macroState.protein, MACRO_TARGETS.protein)}%</b>
+              </div>
+              <span className="rounded-full px-2 py-0.5 text-[10px] font-mono font-bold bg-[#ffb547]/15 text-[#ffb547]">
+                BUILDING
+              </span>
+            </div>
+
+          </div>
+        </div>
+
+      </div>
+
+      {/* ─────────────────────────────────────────────────────────
+          5. 24H TIMELINE CHART (HEART RATE & GLUCOSE)
+      ───────────────────────────────────────────────────────── */}
+      <div className="rounded-xl border border-[#1d2f47] bg-[#0d1726]/90 p-4 backdrop-blur-md shadow-md space-y-2">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <span className="rounded-full border border-[#1d2f47] bg-[#070d16] px-2.5 py-0.5 text-[10px] font-mono text-[#7f96ae]">
+            24H TIMELINE · HEART RATE &amp; GLUCOSE
+          </span>
+          <div className="flex items-center gap-4 text-xs font-mono text-[#7f96ae]">
+            <span className="flex items-center gap-1.5">
+              <span className="h-1 w-3 rounded bg-[#ff5468]" /> Heart Rate
+            </span>
+            <span className="flex items-center gap-1.5">
+              <span className="h-1 w-3 rounded bg-[#2ee6f6]" /> Glucose
+            </span>
+            <span className="flex items-center gap-1.5">
+              <span className="h-1 w-3 rounded bg-[#ffb547]" /> Meal Ingestion
+            </span>
+          </div>
+        </div>
+
+        <div className="w-full h-40 relative">
+          <svg viewBox="0 0 600 150" preserveAspectRatio="none" className="w-full h-full">
+            <defs>
+              <linearGradient id="glGrad" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stopColor="#2ee6f6" stopOpacity="0.35" />
+                <stop offset="100%" stopColor="#2ee6f6" stopOpacity="0" />
+              </linearGradient>
+            </defs>
+
+            {[0, 1, 2, 3, 4, 5, 6].map((k) => (
+              <line key={k} x1={k * 100} x2={k * 100} y1="0" y2="150" stroke="#1d2f47" strokeDasharray="3 5" />
+            ))}
+
+            <path d={`${timelineSvgData.glPath} L600,150 L0,150 Z`} fill="url(#glGrad)" />
+            <path d={timelineSvgData.glPath} fill="none" stroke="#2ee6f6" strokeWidth="2" vectorEffect="non-scaling-stroke" />
+            <path d={timelineSvgData.hrPath} fill="none" stroke="#ff5468" strokeWidth="2" vectorEffect="non-scaling-stroke" />
+
+            {/* Meal Scan Pins */}
+            {[
+              { time: 7.5, emoji: "🥣" },
+              { time: 12.5, emoji: "🥩" },
+              { time: 16.0, emoji: "💧" },
+            ].map((m, idx) => {
+              const x = (m.time / 24) * 600;
+              return (
+                <g key={idx}>
+                  <line x1={x} x2={x} y1="0" y2="150" stroke="#ffb547" strokeWidth="1.5" strokeDasharray="2 2" vectorEffect="non-scaling-stroke" />
+                  <text x={x} y="20" textAnchor="middle" fontSize="11">
+                    {m.emoji}
+                  </text>
+                </g>
+              );
+            })}
+          </svg>
+        </div>
+
+        <div className="flex justify-between font-mono text-[10px] text-[#7f96ae] pt-1 border-t border-[#1d2f47]">
+          <span>00:00</span>
+          <span>04:00</span>
+          <span>08:00</span>
+          <span>12:00</span>
+          <span>16:00</span>
+          <span>20:00</span>
+          <span>24:00</span>
+        </div>
+      </div>
+
+      {/* ─────────────────────────────────────────────────────────
+          6. MACRO & METABOLIC ENERGY HUD
+      ───────────────────────────────────────────────────────── */}
+      <div className="flex items-center justify-between pt-2">
+        <div className="flex items-center gap-2 text-xs font-mono font-bold tracking-widest text-[#7f96ae] uppercase">
+          <span className="text-[#2ee6f6]">02</span> Macro &amp; Metabolic Energy HUD
+        </div>
+        <span className="rounded-full border border-[#1d2f47] bg-[#070d16] px-2.5 py-0.5 text-[10px] font-mono text-[#7f96ae]">
+          target vs consumed
+        </span>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-12 gap-3.5">
+        
+        {/* Circular Nutrient Rings (7 Cols) */}
+        <div className="md:col-span-7 rounded-xl border border-[#1d2f47] bg-[#0d1726]/90 p-4 backdrop-blur-md shadow-md">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-center">
+            
+            {/* Protein */}
+            <div className="flex flex-col items-center">
+              <div className="relative w-20 h-20">
+                <svg viewBox="0 0 96 96" className="w-full h-full drop-shadow-[0_0_6px_rgba(46,230,246,0.2)]">
+                  <circle cx="48" cy="48" r="38" fill="none" stroke="#1d2f47" strokeWidth="9" />
+                  <circle
+                    cx="48"
+                    cy="48"
+                    r="38"
+                    fill="none"
+                    stroke="#4da3ff"
+                    strokeWidth="9"
+                    strokeLinecap="round"
+                    strokeDasharray={`${(2 * Math.PI * 38 * pct(macroState.protein, MACRO_TARGETS.protein)) / 100} ${2 * Math.PI * 38}`}
+                    transform="rotate(-90 48 48)"
+                    className="transition-all duration-700"
+                  />
+                  <text x="48" y="53" textAnchor="middle" fill="#e4f0fb" fontSize="17" fontWeight="700">
+                    {pct(macroState.protein, MACRO_TARGETS.protein)}%
+                  </text>
+                </svg>
+              </div>
+              <div className="text-xs font-semibold mt-1">Protein</div>
+              <div className="font-mono text-[10.5px] text-[#7f96ae]">
+                {macroState.protein} / {MACRO_TARGETS.protein}g
+              </div>
+            </div>
+
+            {/* Healthy Fats */}
+            <div className="flex flex-col items-center">
+              <div className="relative w-20 h-20">
+                <svg viewBox="0 0 96 96" className="w-full h-full drop-shadow-[0_0_6px_rgba(255,181,71,0.2)]">
+                  <circle cx="48" cy="48" r="38" fill="none" stroke="#1d2f47" strokeWidth="9" />
+                  <circle
+                    cx="48"
+                    cy="48"
+                    r="38"
+                    fill="none"
+                    stroke="#ffb547"
+                    strokeWidth="9"
+                    strokeLinecap="round"
+                    strokeDasharray={`${(2 * Math.PI * 38 * pct(macroState.fat, MACRO_TARGETS.fat)) / 100} ${2 * Math.PI * 38}`}
+                    transform="rotate(-90 48 48)"
+                    className="transition-all duration-700"
+                  />
+                  <text x="48" y="53" textAnchor="middle" fill="#e4f0fb" fontSize="17" fontWeight="700">
+                    {pct(macroState.fat, MACRO_TARGETS.fat)}%
+                  </text>
+                </svg>
+              </div>
+              <div className="text-xs font-semibold mt-1">Healthy Fats</div>
+              <div className="font-mono text-[10.5px] text-[#7f96ae]">
+                {macroState.fat} / {MACRO_TARGETS.fat}g
+              </div>
+            </div>
+
+            {/* Fiber */}
+            <div className="flex flex-col items-center">
+              <div className="relative w-20 h-20">
+                <svg viewBox="0 0 96 96" className="w-full h-full drop-shadow-[0_0_6px_rgba(61,220,151,0.2)]">
+                  <circle cx="48" cy="48" r="38" fill="none" stroke="#1d2f47" strokeWidth="9" />
+                  <circle
+                    cx="48"
+                    cy="48"
+                    r="38"
+                    fill="none"
+                    stroke="#3ddc97"
+                    strokeWidth="9"
+                    strokeLinecap="round"
+                    strokeDasharray={`${(2 * Math.PI * 38 * pct(macroState.fiber, MACRO_TARGETS.fiber)) / 100} ${2 * Math.PI * 38}`}
+                    transform="rotate(-90 48 48)"
+                    className="transition-all duration-700"
+                  />
+                  <text x="48" y="53" textAnchor="middle" fill="#e4f0fb" fontSize="17" fontWeight="700">
+                    {pct(macroState.fiber, MACRO_TARGETS.fiber)}%
+                  </text>
+                </svg>
+              </div>
+              <div className="text-xs font-semibold mt-1">Fiber</div>
+              <div className="font-mono text-[10.5px] text-[#7f96ae]">
+                {macroState.fiber} / {MACRO_TARGETS.fiber}g
+              </div>
+            </div>
+
+            {/* Water */}
+            <div className="flex flex-col items-center">
+              <div className="relative w-20 h-20">
+                <svg viewBox="0 0 96 96" className="w-full h-full drop-shadow-[0_0_6px_rgba(46,230,246,0.2)]">
+                  <circle cx="48" cy="48" r="38" fill="none" stroke="#1d2f47" strokeWidth="9" />
+                  <circle
+                    cx="48"
+                    cy="48"
+                    r="38"
+                    fill="none"
+                    stroke="#2ee6f6"
+                    strokeWidth="9"
+                    strokeLinecap="round"
+                    strokeDasharray={`${(2 * Math.PI * 38 * pct(macroState.water, MACRO_TARGETS.water)) / 100} ${2 * Math.PI * 38}`}
+                    transform="rotate(-90 48 48)"
+                    className="transition-all duration-700"
+                  />
+                  <text x="48" y="53" textAnchor="middle" fill="#e4f0fb" fontSize="17" fontWeight="700">
+                    {pct(macroState.water, MACRO_TARGETS.water)}%
+                  </text>
+                </svg>
+              </div>
+              <div className="text-xs font-semibold mt-1">Water</div>
+              <div className="font-mono text-[10.5px] text-[#7f96ae]">
+                {macroState.water} / {MACRO_TARGETS.water}L
+              </div>
+            </div>
+
+          </div>
+        </div>
+
+        {/* Energy & Basal Reserve Bar (5 Cols) */}
+        <div className="md:col-span-5 rounded-xl border border-[#1d2f47] bg-[#0d1726]/90 p-4 flex flex-col justify-between backdrop-blur-md shadow-md">
+          <div>
+            <div className="text-[11px] font-mono tracking-wider text-[#7f96ae]">ENERGY · BASAL RESERVE</div>
+            <div className="font-mono text-3xl font-bold text-[#e4f0fb] my-1">
+              {macroState.kcal} <small className="text-xs text-[#7f96ae]">/ {MACRO_TARGETS.kcal} kcal</small>
+            </div>
+            
+            <div className="h-3 w-full rounded-full bg-[#1d2f47] overflow-hidden my-2">
+              <div
+                className="h-full bg-gradient-to-r from-[#2ee6f6] to-[#3ddc97] rounded-full transition-all duration-700"
+                style={{ width: `${pct(macroState.kcal, MACRO_TARGETS.kcal)}%` }}
+              />
+            </div>
+
+            <div className="text-xs text-[#7f96ae] space-y-0.5 mt-2">
+              <div>
+                Remaining: <b className="text-[#e4f0fb] font-mono">{Math.max(0, MACRO_TARGETS.kcal - macroState.kcal)} kcal</b>
+              </div>
+              <div>
+                Tissue Hydration Index:{" "}
+                <b className="text-[#e4f0fb] font-mono">
+                  {Math.min(99, +(77.2 + (macroState.water - 1.65) * 8).toFixed(1))}%
+                </b>
+              </div>
+            </div>
+          </div>
+
+          <div className="pt-2 border-t border-[#1d2f47]/60 flex items-center justify-between">
+            <span className="rounded-full border border-[#2ee6f6]/30 bg-[#2ee6f6]/10 px-2.5 py-0.5 text-[10px] font-mono font-bold text-[#2ee6f6]">
+              24H AI PRESCRIPTION ACTIVE
+            </span>
+            <span className="text-[11px] font-mono text-[#3ddc97]">METABOLIC NOMINAL</span>
+          </div>
+        </div>
+
+      </div>
+
+      {/* ─────────────────────────────────────────────────────────
+          7. MICRO-ARRAY ASSAY (VITAMINS & MINERALS)
+      ───────────────────────────────────────────────────────── */}
+      <div className="flex items-center gap-2 text-xs font-mono font-bold tracking-widest text-[#7f96ae] uppercase pt-2">
+        <span className="text-[#2ee6f6]">03</span> Micro-Array Assay
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
+        
+        {/* Key Vitamins */}
+        <div className="rounded-xl border border-[#1d2f47] bg-[#0d1726]/90 p-4 backdrop-blur-md shadow-md space-y-3">
+          <div className="text-xs font-bold text-[#e4f0fb]">
+            Key Vitamins <span className="text-[#7f96ae] font-normal">(A, B, C, D3, E, K)</span>
+          </div>
+
+          <div className="space-y-2.5">
+            {Object.entries(VITAMIN_TARGETS).map(([k, [meta, tg]]) => {
+              const p = pct(macroState.vit[k], tg);
+              const chipText = k === "D" && p < 50 ? "DEFICIT" : p >= 70 ? "OPTIMAL" : "ACTIVE";
+              const chipColor =
+                k === "D" && p < 50
+                  ? "bg-[#ff5468]/15 text-[#ff5468]"
+                  : p >= 70
+                  ? "bg-[#3ddc97]/15 text-[#3ddc97]"
+                  : "bg-[#ffb547]/15 text-[#ffb547]";
+
+              return (
+                <div key={k} className="space-y-1">
+                  <div className="flex justify-between text-xs">
+                    <span className="text-slate-200">{meta[0]}</span>
+                    <span className="font-mono text-[11px] flex items-center gap-1.5">
+                      <span className="text-[#e4f0fb]">{macroState.vit[k]} {meta[2]}</span>
+                      <span className={`px-1.5 py-0.2 rounded text-[9px] font-bold ${chipColor}`}>
+                        {chipText}
+                      </span>
+                    </span>
+                  </div>
+                  <div className="h-1.5 w-full rounded-full bg-[#1d2f47] overflow-hidden">
+                    <div
+                      className="h-full rounded-full transition-all duration-700"
+                      style={{ width: `${p}%`, backgroundColor: getProgressColor(p) }}
+                    />
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Essential Minerals */}
+        <div className="rounded-xl border border-[#1d2f47] bg-[#0d1726]/90 p-4 backdrop-blur-md shadow-md space-y-3">
+          <div className="text-xs font-bold text-[#e4f0fb]">
+            Essential Minerals <span className="text-[#7f96ae] font-normal">(Fe, Ca, Mg, Zn, K)</span>
+          </div>
+
+          <div className="space-y-2.5">
+            {Object.entries(MINERAL_TARGETS).map(([k, [name, unit, tg]]) => {
+              const p = pct(macroState.min[k], tg);
+              const chipText = k === "Ca" && p < 70 ? "WATCH" : p >= 70 ? "OPTIMAL" : "OK";
+              const chipColor =
+                k === "Ca" && p < 70
+                  ? "bg-[#ffb547]/15 text-[#ffb547]"
+                  : p >= 70
+                  ? "bg-[#3ddc97]/15 text-[#3ddc97]"
+                  : "bg-[#2ee6f6]/15 text-[#2ee6f6]";
+
+              return (
+                <div key={k} className="space-y-1">
+                  <div className="flex justify-between text-xs">
+                    <span className="text-slate-200">{name}</span>
+                    <span className="font-mono text-[11px] flex items-center gap-1.5">
+                      <span className="text-[#e4f0fb]">{macroState.min[k]} {unit}</span>
+                      <span className={`px-1.5 py-0.2 rounded text-[9px] font-bold ${chipColor}`}>
+                        {chipText}
+                      </span>
+                    </span>
+                  </div>
+                  <div className="h-1.5 w-full rounded-full bg-[#1d2f47] overflow-hidden">
+                    <div
+                      className="h-full rounded-full transition-all duration-700"
+                      style={{ width: `${p}%`, backgroundColor: getProgressColor(p) }}
+                    />
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+      </div>
+
+      {/* ─────────────────────────────────────────────────────────
+          8. RFID SPACE-MEAL SCANNER
+      ───────────────────────────────────────────────────────── */}
+      <div className="flex items-center justify-between pt-2">
+        <div className="flex items-center gap-2 text-xs font-mono font-bold tracking-widest text-[#7f96ae] uppercase">
+          <span className="text-[#2ee6f6]">04</span> RFID Space-Meal Scanner
+        </div>
+        <span className="rounded-full border border-[#1d2f47] bg-[#070d16] px-2.5 py-0.5 text-[10px] font-mono text-[#7f96ae]">
+          {macroState.scans} packs scanned today
+        </span>
+      </div>
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
+        {RFID_PACKS.map((pack, idx) => {
+          const isScanning = activeScanIdx === idx;
+          return (
+            <div
+              key={pack.code}
+              className={`rounded-xl border p-4 flex flex-col justify-between transition-all backdrop-blur-md shadow-md ${
+                isScanning
+                  ? "border-[#2ee6f6] bg-[#2ee6f6]/15 shadow-[0_0_20px_rgba(46,230,246,0.3)]"
+                  : "border-[#1d2f47] bg-[#0d1726]/90 hover:border-[#2ee6f6]/50"
+              }`}
+            >
+              <div className="space-y-2">
+                <div className="h-12 w-12 rounded-xl bg-[#2ee6f6]/10 border border-[#1d2f47] flex items-center justify-center text-2xl">
+                  {pack.emoji}
+                </div>
+                <div>
+                  <b className="text-xs text-[#e4f0fb] block line-clamp-1">{pack.name}</b>
+                  <code className="font-mono text-[10px] text-[#7f96ae]">{pack.code}</code>
+                </div>
+                <div className="text-[10px] text-[#7f96ae] font-mono">Autonomous Nutrient Stream</div>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => triggerScan(idx)}
+                disabled={activeScanIdx !== null}
+                className={`mt-4 w-full rounded-lg py-2 text-xs font-mono font-bold tracking-wider transition ${
+                  isScanning
+                    ? "border border-[#3ddc97] bg-[#3ddc97]/20 text-[#3ddc97]"
+                    : "border border-[#2ee6f6] text-[#2ee6f6] bg-transparent hover:bg-[#2ee6f6] hover:text-[#070d16]"
+                }`}
+              >
+                {isScanning ? "✓ INGESTED" : "TRIGGER RFID"}
+              </button>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* ─────────────────────────────────────────────────────────
+          9. TOAST NOTIFICATION
+      ───────────────────────────────────────────────────────── */}
+      {toastMessage && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 rounded-xl border border-[#2ee6f6] bg-[#0d1726] px-5 py-2.5 text-xs font-mono text-[#e4f0fb] shadow-[0_0_25px_rgba(46,230,246,0.4)] animate-fade-in flex items-center gap-2">
+          <span>{toastMessage}</span>
+        </div>
+      )}
+
+      {/* ─────────────────────────────────────────────────────────
+          10. IN-PLACE PROFILE & CREDENTIALS MODAL
+      ───────────────────────────────────────────────────────── */}
+      {profileModalOpen && (
+        <div className="fixed inset-0 z-[90] flex items-center justify-center bg-[#070d16]/85 p-4 backdrop-blur-md animate-fade-in">
+          <div className="w-full max-w-lg rounded-2xl border border-[#1d2f47] bg-[#0d1726] p-6 shadow-2xl space-y-4">
+            <div className="flex items-start justify-between border-b border-[#1d2f47] pb-3">
+              <div className="flex items-center gap-3">
+                <div className="h-10 w-10 rounded-xl bg-[#2ee6f6]/20 border border-[#2ee6f6]/30 flex items-center justify-center text-[#2ee6f6] font-bold">
+                  {astronautInitials}
+                </div>
+                <div>
+                  <h2 className="text-base font-bold text-white">{astronautName}</h2>
+                  <p className="text-xs font-mono text-[#2ee6f6]">{user?.astronautId || "AST-001"} · Commander</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setProfileModalOpen(false)}
+                className="rounded-lg p-1.5 text-[#7f96ae] hover:bg-white/10 hover:text-white"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+
+            <div className="grid grid-cols-2 gap-2.5 text-xs">
+              <div className="p-2.5 rounded-xl bg-[#070d16] border border-[#1d2f47]">
+                <span className="text-[#7f96ae] text-[10px] block">Blood Type</span>
+                <span className="font-semibold text-white">{astronaut.bloodType}</span>
+              </div>
+              <div className="p-2.5 rounded-xl bg-[#070d16] border border-[#1d2f47]">
+                <span className="text-[#7f96ae] text-[10px] block">Nationality</span>
+                <span className="font-semibold text-white">{astronaut.nationality}</span>
+              </div>
+              <div className="p-2.5 rounded-xl bg-[#070d16] border border-[#1d2f47]">
+                <span className="text-[#7f96ae] text-[10px] block">Height / Weight</span>
+                <span className="font-semibold text-white">{astronaut.height} / {astronaut.weight}</span>
+              </div>
+              <div className="p-2.5 rounded-xl bg-[#070d16] border border-[#1d2f47]">
+                <span className="text-[#7f96ae] text-[10px] block">Emergency Contact</span>
+                <span className="font-semibold text-white">{astronaut.emergencyContact}</span>
+              </div>
+            </div>
+
+            <div className="pt-2 flex items-center justify-between border-t border-[#1d2f47]">
+              <button
+                type="button"
+                onClick={() => {
+                  void logout();
+                  setProfileModalOpen(false);
+                }}
+                className="rounded-xl border border-[#ff5468]/30 bg-[#ff5468]/10 px-3.5 py-2 text-xs font-semibold text-[#ff5468] hover:bg-[#ff5468]/20 transition"
+              >
+                Sign Out
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setProfileModalOpen(false)}
+                className="rounded-xl bg-[#2ee6f6] px-4 py-2 text-xs font-bold text-[#070d16] hover:bg-[#20cbd9] transition"
+              >
+                Done
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ─────────────────────────────────────────────────────────
+          11. IN-PLACE QUICK MESSAGE MODAL
+      ───────────────────────────────────────────────────────── */}
+      {quickMessageOpen && (
+        <div className="fixed inset-0 z-[90] flex items-center justify-center bg-[#070d16]/85 p-4 backdrop-blur-md animate-fade-in">
+          <div className="w-full max-w-md rounded-2xl border border-[#1d2f47] bg-[#0d1726] p-5 shadow-2xl space-y-4">
+            <div className="flex items-start justify-between">
+              <div>
+                <span className="text-[10px] font-bold uppercase tracking-wider text-[#2ee6f6] font-mono">Flight Surgeon Comms</span>
+                <h2 className="text-base font-bold text-white mt-0.5">Message to Dr. Sarah Chen</h2>
+              </div>
+              <button
+                type="button"
+                onClick={() => setQuickMessageOpen(false)}
+                className="rounded-lg p-1.5 text-[#7f96ae] hover:bg-white/10 hover:text-white"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+
+            {quickMessageSent ? (
+              <div className="rounded-xl border border-[#3ddc97]/30 bg-[#3ddc97]/10 p-4 text-center space-y-1">
+                <CheckCircle2 className="mx-auto h-7 w-7 text-[#3ddc97]" />
+                <p className="text-xs font-bold text-white">Message Transmitted to Flight Surgeon</p>
+              </div>
+            ) : (
+              <>
+                <textarea
+                  value={quickMessageText}
+                  onChange={(e) => setQuickMessageText(e.target.value)}
+                  rows={3}
+                  placeholder="Type your medical update or symptom note…"
+                  className="w-full rounded-xl border border-[#1d2f47] bg-[#070d16] p-3 text-xs text-white placeholder:text-[#7f96ae] outline-none focus:border-[#2ee6f6] resize-none"
+                />
+
+                <div className="flex items-center justify-end gap-2 pt-1">
+                  <button
+                    type="button"
+                    onClick={() => setQuickMessageOpen(false)}
+                    className="rounded-xl border border-[#1d2f47] bg-[#070d16] px-3 py-2 text-xs text-[#7f96ae] hover:bg-white/5 transition"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    disabled={quickMessageSending || !quickMessageText.trim()}
+                    onClick={sendQuickDoctorMessage}
+                    className="inline-flex items-center gap-1.5 rounded-xl bg-[#2ee6f6] px-4 py-2 text-xs font-bold text-[#070d16] hover:bg-[#20cbd9] disabled:opacity-40 transition"
+                  >
+                    <Send className="h-3.5 w-3.5" />
+                    <span>{quickMessageSending ? "Sending…" : "Send Message"}</span>
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      )}
 
     </div>
   );

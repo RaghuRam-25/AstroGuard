@@ -4,6 +4,7 @@ import { SpeedInsights } from "@vercel/speed-insights/next";
 import { AuthProvider } from "../context/AuthContext";
 import { RegistrationProvider } from "../context/RegistrationContext";
 import AppLayout from "./components/AppLayout";
+import CosmicSpaceBackground from "../components/shared/CosmicSpaceBackground";
 import "./index.css";
 
 export const metadata: Metadata = {
@@ -19,7 +20,8 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" className="h-full antialiased">
-      <body className="min-h-full bg-[#020817] text-white">
+      <body className="min-h-full bg-[#020817] text-white relative">
+        <CosmicSpaceBackground />
         <AuthProvider>
           <RegistrationProvider>
             <AppLayout>{children}</AppLayout>

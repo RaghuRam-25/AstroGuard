@@ -155,13 +155,13 @@ export default function AnalysisPanel() {
   };
 
   return (
-    <section className="glass-card flex h-[calc(100dvh-90px)] min-h-0 max-h-full flex-col overflow-hidden rounded-2xl lg:w-[calc(100%-24px)]">
+    <section className="flex h-[min(720px,calc(100vh-140px))] min-h-0 max-h-full flex-col overflow-hidden rounded-2xl border border-white/[0.08] bg-[#071324]/60 backdrop-blur-md w-full">
       {/* Header */}
-      <header className="flex shrink-0 flex-wrap items-center justify-between gap-3 border-b border-sky-400/10 px-4 py-4 sm:px-5">
+      <header className="flex shrink-0 flex-wrap items-center justify-between gap-3 border-b border-white/[0.06] px-4 py-3.5 sm:px-5 bg-slate-900/30">
         <div className="flex min-w-0 items-center gap-3">
-          <span className="relative flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-primary/25 bg-primary/10 shadow-[0_0_20px_rgba(56,189,248,0.25)]">
-            <Brain className="h-5 w-5 text-primary" />
-            <span className="absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full border-2 border-[#061426] bg-success" />
+          <span className="relative flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-sky-400/30 bg-sky-500/10">
+            <Brain className="h-5 w-5 text-sky-400" />
+            <span className="absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full border-2 border-[#061426] bg-emerald-400" />
           </span>
           <div className="min-w-0">
             <div className="flex items-center gap-2">

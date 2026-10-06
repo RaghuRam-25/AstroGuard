@@ -4,34 +4,31 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
   LayoutDashboard,
-  Activity,
-  Radio,
   Brain,
-  User,
-  FlaskConical,
-  Microscope,
-  Satellite,
   MessageCircle,
+  Radio,
   X,
   LogOut,
+  User,
+  ChevronRight,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { astronaut, missionInfo } from "@/data/mockData";
+import { astronaut } from "@/data/mockData";
 import { useAuth } from "@/context/AuthContext";
+import SidebarSpacewalkBackground from "./SidebarSpacewalkBackground";
 
 const navItems = [
-  { href: "/astronaut/dashboard", label: "Health Dashboard", icon: LayoutDashboard },
-  { href: "/astronaut/data-input", label: "Telemetry & RFID", icon: Radio },
+  { href: "/astronaut/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { href: "/astronaut/ai-analysis", label: "AI Analysis", icon: Brain },
-  { href: "/astronaut/medical-consult", label: "Chat & Call", icon: MessageCircle },
-  { href: "/astronaut/profile", label: "Profile", icon: User },
+  { href: "/astronaut/medical-consult", label: "Medical Consult", icon: MessageCircle },
+  { href: "/astronaut/bio-link", label: "Bio-Link", icon: Radio },
 ];
 
 function AstroGuardLogo() {
   return (
     <svg
-      width="48"
-      height="48"
+      width="36"
+      height="36"
       viewBox="0 0 48 48"
       fill="none"
       xmlns="http://www.w3.org/2000/svg"
@@ -87,7 +84,7 @@ export default function Sidebar({ open, onClose }: SidebarProps) {
   const { user, logout } = useAuth();
 
   const isActive = (href: string) =>
-    pathname === href || pathname.startsWith(href + "/");
+    pathname === href || (href !== "/astronaut/dashboard" && pathname.startsWith(href));
 
   const initials = user?.name
     ? user.name
@@ -110,35 +107,34 @@ export default function Sidebar({ open, onClose }: SidebarProps) {
         onClick={onClose}
         aria-hidden="true"
       />
+
       <aside
         className={cn(
-          "fixed inset-y-0 left-0 z-50 flex w-[250px] shrink-0 flex-col border-r border-sky-400/10 transition-transform duration-300 ease-in-out lg:translate-x-0",
+          "fixed inset-y-0 left-0 z-50 flex w-[240px] shrink-0 flex-col overflow-hidden border-r border-sky-400/20 bg-[#020712]/30 backdrop-blur-sm transition-transform duration-300 ease-in-out lg:translate-x-0 shadow-2xl",
           open ? "translate-x-0" : "-translate-x-full"
         )}
-        style={{
-          backgroundImage:
-            "linear-gradient(to bottom, rgba(2, 8, 23, 0.95), rgba(4, 16, 31, 0.9)), url('/sidebarbg.png')",
-          backgroundSize: "cover",
-          backgroundPosition: "center",
-        }}
         aria-label="Main navigation"
       >
+        {/* Full-Height Spacewalk Floating Astronaut & Satellite Animation Background */}
+        <SidebarSpacewalkBackground />
+
         {/* Header: Logo & Mobile Close */}
-        <div className="flex items-center justify-between px-5 pt-5 pb-3 shrink-0">
+        <div className="relative z-10 flex items-center justify-between px-5 pt-5 pb-4 shrink-0 border-b border-white/[0.12] bg-[#020814]/50 backdrop-blur-md">
           <Link
             href="/astronaut/dashboard"
+            onClick={onClose}
             className="flex items-center gap-3"
             aria-label="AstroGuard home"
           >
             <AstroGuardLogo />
-            <span className="flex flex-col">
-              <span className="text-lg font-bold tracking-tight text-white">
-                Astro<span className="text-primary">Guard</span>
+            <div className="flex flex-col">
+              <span className="text-base font-bold tracking-tight text-white drop-shadow">
+                Astro<span className="text-cyan-300">Guard</span>
               </span>
-              <span className="text-[10px] font-medium uppercase tracking-[0.18em] text-slate-400">
-                Astronaut Health
+              <span className="text-[9px] font-semibold uppercase tracking-[0.16em] text-cyan-200">
+                Astronaut Portal
               </span>
-            </span>
+            </div>
           </Link>
 
           <button
@@ -151,9 +147,9 @@ export default function Sidebar({ open, onClose }: SidebarProps) {
           </button>
         </div>
 
-        {/* Scrollable Navigation Area */}
-        <div className="flex-1 min-h-0 overflow-y-auto px-4 py-2 space-y-4 [scrollbar-width:thin] [scrollbar-color:rgba(56,189,248,0.2)_transparent]">
-          <nav className="flex flex-col gap-1">
+        {/* Primary 3-Item Navigation */}
+        <div className="relative z-10 flex-1 min-h-0 overflow-y-auto px-3.5 py-5 space-y-2 [scrollbar-width:none]">
+          <nav className="flex flex-col gap-2">
             {navItems.map((item) => {
               const Icon = item.icon;
               const active = isActive(item.href);
@@ -164,19 +160,16 @@ export default function Sidebar({ open, onClose }: SidebarProps) {
                   onClick={onClose}
                   aria-current={active ? "page" : undefined}
                   className={cn(
-                    "group relative flex items-center gap-3 rounded-xl px-3 py-2 text-sm font-medium transition-all duration-200",
+                    "group flex items-center gap-3 rounded-xl px-3.5 py-3 text-xs font-semibold transition-all duration-150 backdrop-blur-md shadow-md",
                     active
-                      ? "bg-sky-500/15 text-sky-300 shadow-[0_0_20px_rgba(56,189,248,0.12)] border border-sky-400/20"
-                      : "text-slate-300 hover:bg-white/[0.06] hover:text-white"
+                      ? "bg-cyan-500/90 text-[#021127] font-bold shadow-lg shadow-cyan-500/30 border border-cyan-300"
+                      : "bg-[#020712]/60 text-slate-100 hover:bg-sky-500/30 hover:text-white border border-white/10"
                   )}
                 >
-                  {active && (
-                    <span className="absolute left-0 top-1/2 h-5 w-1 -translate-y-1/2 rounded-full bg-primary shadow-[0_0_8px_rgba(56,189,248,0.9)]" />
-                  )}
                   <Icon
                     className={cn(
                       "h-4 w-4 shrink-0 transition-colors",
-                      active ? "text-primary" : "text-slate-400 group-hover:text-slate-200"
+                      active ? "text-[#021127]" : "text-cyan-300 group-hover:text-white"
                     )}
                   />
                   <span className="truncate">{item.label}</span>
@@ -184,47 +177,30 @@ export default function Sidebar({ open, onClose }: SidebarProps) {
               );
             })}
           </nav>
-
-          {/* Mission status card */}
-          <div className="rounded-xl border border-sky-400/15 bg-card-secondary/40 p-3.5 backdrop-blur-sm">
-            <p className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-[0.16em] text-slate-400">
-              <Satellite className="h-3 w-3 text-primary" />
-              Mission Status
-            </p>
-            <p className="mt-1.5 text-xs font-semibold text-white">
-              {missionInfo.mission}
-            </p>
-            <div className="mt-2 flex items-center justify-between text-[11px] text-slate-400">
-              <span>Day {missionInfo.missionDay}</span>
-              <span className="flex items-center gap-1.5 font-semibold text-success">
-                <span className="relative flex h-1.5 w-1.5">
-                  <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-success opacity-60" />
-                  <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-success" />
-                </span>
-                ACTIVE
-              </span>
-            </div>
-          </div>
         </div>
 
-        {/* Fixed Bottom: Astronaut Profile & Logout Button (ALWAYS VISIBLE) */}
-        <div className="shrink-0 border-t border-sky-400/15 bg-[#020817]/95 px-4 py-3.5 backdrop-blur-md">
-          <div className="flex items-center gap-3 rounded-xl border border-sky-400/15 bg-slate-900/60 p-2.5">
-            <div className="relative shrink-0">
-              <div className="flex h-9 w-9 items-center justify-center rounded-full border border-sky-400/30 bg-gradient-to-br from-sky-500/25 to-cyan-400/10 text-xs font-bold text-sky-300">
+        {/* Fixed Bottom: Astronaut Profile Summary, Profile Access, & Logout */}
+        <div className="relative z-10 shrink-0 border-t border-white/[0.08] bg-[#020710]/80 backdrop-blur-xl p-3 space-y-2">
+          <Link
+            href="/astronaut/profile"
+            onClick={onClose}
+            className="group flex items-center justify-between rounded-xl border border-white/[0.08] bg-slate-900/60 p-2.5 transition hover:bg-slate-900/90 hover:border-sky-400/30"
+          >
+            <div className="flex items-center gap-2.5 min-w-0">
+              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-sky-500/25 text-xs font-bold text-sky-200 border border-sky-400/40 shrink-0">
                 {initials}
               </div>
-              <span className="absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full border-2 border-[#061426] bg-success" />
+              <div className="min-w-0 flex-1 text-left">
+                <p className="truncate text-xs font-semibold text-white group-hover:text-sky-300 transition">
+                  {user?.name || astronaut.name}
+                </p>
+                <p className="text-[10px] text-slate-300 truncate">
+                  {user?.astronautId || astronaut.id} · Astronaut
+                </p>
+              </div>
             </div>
-            <div className="min-w-0 flex-1">
-              <p className="truncate text-xs font-semibold text-white">
-                {user?.name || astronaut.name}
-              </p>
-              <p className="text-[10px] font-medium text-sky-400">
-                {user?.astronautId || astronaut.id} • Astronaut
-              </p>
-            </div>
-          </div>
+            <ChevronRight className="h-4 w-4 text-slate-400 group-hover:text-sky-400 transition shrink-0" />
+          </Link>
 
           <button
             type="button"
@@ -232,11 +208,10 @@ export default function Sidebar({ open, onClose }: SidebarProps) {
               void logout();
               onClose();
             }}
-            className="mt-2.5 flex w-full items-center justify-center gap-2 rounded-xl border border-rose-500/30 bg-rose-500/15 px-3 py-2.5 text-xs font-bold text-rose-200 transition-all duration-200 hover:border-rose-400/60 hover:bg-rose-500/25 hover:text-white shadow-[0_0_15px_rgba(244,63,94,0.15)] active:scale-[0.98]"
-            title="Log out of session"
+            className="flex w-full items-center justify-center gap-2 rounded-xl border border-rose-500/25 bg-rose-500/15 py-2 text-xs font-semibold text-rose-200 transition hover:bg-rose-500/25 active:scale-[0.98]"
           >
-            <LogOut className="h-4 w-4 text-rose-400" />
-            <span>Logout Session</span>
+            <LogOut className="h-3.5 w-3.5" />
+            <span>Sign Out</span>
           </button>
         </div>
       </aside>

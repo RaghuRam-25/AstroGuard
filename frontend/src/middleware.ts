@@ -7,7 +7,7 @@ const ROLE_ROUTES: Record<string, string> = {
 };
 
 const PROTECTED_PREFIXES = ["/astronaut", "/medical", "/mission-control"];
-const PUBLIC_ROUTES = ["/", "/login", "/register", "/about", "/mission", "/contact", "/sensors", "/unauthorized"];
+const PUBLIC_ROUTES = ["/", "/login", "/register", "/about", "/mission", "/contact", "/sensors", "/astrocrew", "/unauthorized"];
 
 // Alerts are restricted to Flight Surgeons and Mission Controllers.
 const ALERTS_ALLOWED_ROLES = ["medical_officer", "mission_control"];

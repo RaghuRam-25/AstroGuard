@@ -51,24 +51,24 @@ export default function LatestDataSummary() {
   ];
 
   return (
-    <section className="glass-card rounded-2xl p-5">
-      <div className="flex items-center justify-between border-b border-sky-400/10 pb-3.5">
+    <section className="rounded-2xl border border-white/[0.08] bg-[#071324]/60 backdrop-blur-md p-5 space-y-3">
+      <div className="flex items-center justify-between border-b border-white/[0.06] pb-2.5">
         <div className="flex items-center gap-2">
-          <Activity className="h-4 w-4 text-primary" />
-          <h3 className="text-sm font-bold text-white">Live Telemetry Snapshot</h3>
+          <Activity className="h-4 w-4 text-sky-400" />
+          <h3 className="text-xs font-semibold uppercase tracking-wider text-slate-400">Live Telemetry Snapshot</h3>
         </div>
         <span className="flex items-center gap-1 text-[10px] font-mono text-emerald-400">
           <Radio className="h-3 w-3 animate-pulse" /> 100 Hz Sync
         </span>
       </div>
 
-      <div className="mt-3.5 space-y-2.5">
+      <div className="space-y-2">
         {rows.map((row) => {
           const Icon = row.icon;
           return (
             <div
               key={row.label}
-              className="flex items-center justify-between gap-3 rounded-xl border border-sky-400/10 bg-card-secondary/40 px-3.5 py-2.5"
+              className="flex items-center justify-between gap-3 rounded-xl border border-white/[0.06] bg-slate-900/40 px-3.5 py-2"
             >
               <span className="flex items-center gap-2.5 text-xs font-semibold text-slate-300">
                 <Icon className={cn("h-4 w-4", row.accent)} />

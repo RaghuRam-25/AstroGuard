@@ -603,4 +603,20 @@ export const getMedicalAllocations = (missionId?: string) =>
 export const updateMedicalAllocation = (medicalOfficerId: string, data: { missionId?: string; astronautIds: string[] }) =>
   apiRequest(`/api/mission-control/medical-allocations/${medicalOfficerId}`, { method: "PUT", body: JSON.stringify(data) });
 
+// ─────────────────────────────────────────────────────────
+//  Bio-Link Gateway & Hardware Device Management
+// ─────────────────────────────────────────────────────────
+
+export const getGatewayStatus = () => apiRequest("/api/devices/gateway-status");
+export const getAstronautDevices = () => apiRequest("/api/devices");
+export const pairNewDevice = (payload: Record<string, unknown>) =>
+  apiRequest("/api/devices/pair", { method: "POST", body: JSON.stringify(payload) });
+export const updateDeviceStatus = (deviceId: string, payload: Record<string, unknown>) =>
+  apiRequest(`/api/devices/${encodeURIComponent(deviceId)}/status`, { method: "PATCH", body: JSON.stringify(payload) });
+export const unpairDevice = (deviceId: string) =>
+  apiRequest(`/api/devices/${encodeURIComponent(deviceId)}`, { method: "DELETE" });
+export const syncBufferedTelemetry = (packets: unknown[]) =>
+  apiRequest("/api/devices/sync-buffered", { method: "POST", body: JSON.stringify({ packets }) });
+
+
 

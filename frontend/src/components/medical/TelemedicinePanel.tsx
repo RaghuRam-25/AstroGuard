@@ -114,20 +114,7 @@ export default function TelemedicinePanel({ peer, astronautName, onInitiateCall 
   return (
     <section className="flex min-h-[480px] flex-col overflow-hidden rounded-2xl border border-cyan-400/20 bg-[#0a141f]/85 shadow-[0_0_30px_rgba(6,182,212,0.06)] backdrop-blur-xl">
       <div className="border-b border-cyan-400/10 p-4">
-        <div className="flex items-center justify-between gap-3">
-          <div>
-            <h2 className="flex items-center gap-2 text-sm font-bold text-white">
-              <Satellite className="h-4 w-4 text-cyan-300" /> Deep-Space Telemedicine Link
-            </h2>
-            <p className="mt-0.5 text-[11px] text-slate-400">
-              {peer ? `${astronautName} · end-to-end encrypted clinical channel` : "Nothing connected yet"}
-            </p>
-          </div>
-          <div className="flex items-center gap-1.5 rounded-xl border border-emerald-400/25 bg-emerald-400/10 px-2.5 py-1.5 font-mono text-[9px] font-bold text-emerald-300">
-            <span className={`h-1.5 w-1.5 rounded-full ${socketReady ? "animate-pulse bg-emerald-400" : "bg-slate-500"}`} />
-            {socketReady ? (peer ? (online ? "LIVE · ONLINE" : "LIVE · OFFLINE") : "CHANNEL READY") : "CONNECTING"}
-          </div>
-        </div>
+
 
         <div className="mt-3 flex flex-wrap gap-1.5">
           <StatusPill icon={<Wifi className="h-3 w-3" />} label="Uplink 99.2%" tone="cyan" />

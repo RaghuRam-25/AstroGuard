@@ -25,6 +25,8 @@
   --animate-fade-in-up: fade-in-up 0.6s ease-out both;
   --animate-pulse-soft: pulse-soft 2.4s ease-in-out infinite;
   --animate-glow-pulse: glow-pulse 2.6s ease-in-out infinite;
+  --animate-earth-spin: earth-spin 80s linear infinite;
+  --animate-moon-orbit: moon-orbit 28s ease-in-out infinite;
 
   @keyframes fade-in {
     from {
@@ -63,6 +65,88 @@
     }
     50% {
       box-shadow: 0 0 18px 2px rgba(56, 189, 248, 0.35);
+    }
+  }
+
+  @keyframes earth-spin {
+    0% {
+      background-position: 0% 0%;
+    }
+    100% {
+      background-position: -200% 0%;
+    }
+  }
+
+  @keyframes moon-orbit {
+    0% {
+      transform: rotate(0deg) translateX(min(280px, 36vw)) rotate(0deg) scale(1);
+      z-index: 30;
+      opacity: 1;
+    }
+    25% {
+      transform: rotate(90deg) translateX(min(280px, 36vw)) rotate(-90deg) scale(0.85);
+      z-index: 10;
+      opacity: 0.9;
+    }
+    50% {
+      transform: rotate(180deg) translateX(min(280px, 36vw)) rotate(-180deg) scale(0.68);
+      z-index: -1;
+      opacity: 0.6;
+    }
+    75% {
+      transform: rotate(270deg) translateX(min(280px, 36vw)) rotate(-270deg) scale(0.85);
+      z-index: 10;
+      opacity: 0.9;
+    }
+    100% {
+      transform: rotate(360deg) translateX(min(280px, 36vw)) rotate(-360deg) scale(1);
+      z-index: 30;
+      opacity: 1;
+    }
+  }
+
+  @keyframes astronaut-float {
+    0% {
+      transform: translateY(0px) translateX(0px) rotate(0deg) scale(1);
+    }
+    25% {
+      transform: translateY(-16px) translateX(8px) rotate(3deg) scale(1.04);
+    }
+    50% {
+      transform: translateY(-28px) translateX(-6px) rotate(-2.5deg) scale(1.06);
+    }
+    75% {
+      transform: translateY(-12px) translateX(-10px) rotate(-4deg) scale(1.02);
+    }
+    100% {
+      transform: translateY(0px) translateX(0px) rotate(0deg) scale(1);
+    }
+  }
+
+  @keyframes satellite-fly {
+    0% {
+      transform: translate(-18px, -10px) rotate(-3deg) scale(0.92);
+      opacity: 0.9;
+    }
+    50% {
+      transform: translate(22px, 14px) rotate(6deg) scale(1.08);
+      opacity: 1;
+    }
+    100% {
+      transform: translate(-18px, -10px) rotate(-3deg) scale(0.92);
+      opacity: 0.9;
+    }
+  }
+
+  @keyframes orbit-drift {
+    0% {
+      transform: scale(1.04) translate(0px, 0px);
+    }
+    50% {
+      transform: scale(1.1) translate(-12px, 8px);
+    }
+    100% {
+      transform: scale(1.04) translate(0px, 0px);
     }
   }
 }
@@ -132,21 +216,60 @@ body {
   background: rgba(7, 26, 46, 0.78);
 }
 
-/* Futuristic scanner beam (CBC Scanner mode) */
-@keyframes scan-beam {
+/* ECG running animation */
+@keyframes ecg-run {
   0% {
-    top: 10%;
-    opacity: 0.15;
-  }
-  50% {
-    opacity: 1;
+    transform: translateX(0);
   }
   100% {
-    top: 88%;
-    opacity: 0.15;
+    transform: translateX(-50%);
   }
 }
 
-@utility animate-scan-beam {
-  animation: scan-beam 3.4s ease-in-out infinite;
+/* Body scan laser beam */
+@keyframes body-scan {
+  0%, 100% {
+    top: -5%;
+    opacity: 0.2;
+  }
+  50% {
+    top: 90%;
+    opacity: 0.85;
+  }
 }
+
+/* Heart & Organ Pulse Wave */
+@keyframes organ-pulse {
+  0% {
+    transform: scale(0.6);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(2.6);
+    opacity: 0;
+  }
+}
+
+/* Avatar Hue Spin */
+@keyframes hue-spin {
+  to {
+    filter: hue-rotate(360deg);
+  }
+}
+
+@utility animate-ecg-wave {
+  animation: ecg-run 4.5s linear infinite;
+}
+
+@utility animate-body-scan {
+  animation: body-scan 3.8s ease-in-out infinite;
+}
+
+@utility animate-organ-pulse {
+  animation: organ-pulse 1.8s ease-out infinite;
+}
+
+@utility animate-hue-spin {
+  animation: hue-spin 8s linear infinite;
+}
+
