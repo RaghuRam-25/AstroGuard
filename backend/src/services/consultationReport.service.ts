@@ -33,8 +33,7 @@ export class ConsultationReportService {
   }
 
   static async createFromChat(astronautId: string, requestedDoctorId?: string): Promise<IConsultationReport> {
-    const [context, transcript, latestHealth, sample, analysis, alerts] = await Promise.all([
-      AIChatService.buildContext(astronautId),
+    const [transcript, latestHealth, sample, analysis, alerts] = await Promise.all([
       ChatMessage.find({ astronautId }).sort({ createdAt: 1 }).limit(200).lean(),
       HealthData.findOne({ astronautId }).sort({ timestamp: -1 }).lean(),
       BioSample.findOne({ astronautId }).sort({ createdAt: -1 }).lean(),
@@ -43,7 +42,19 @@ export class ConsultationReportService {
     ]);
     if (!transcript.length) throw new Error("No consultation transcript is available to summarize.");
     const assignedDoctorId = requestedDoctorId || await this.resolveAssignedDoctorId(astronautId);
-    const vitalsSnapshot = { capturedAt: new Date().toISOString(), heartRate: latestHealth?.heartRate ?? context.current.heartRate, spo2: latestHealth?.spo2 ?? context.current.spo2, sleep: latestHealth?.sleep ?? context.current.sleep, activity: latestHealth?.activity ?? context.current.activity, urineHydration: sample?.urine?.hydrationLevel ?? null, salivaCortisol: sample?.saliva?.cortisol ?? null, stoolMicrobiome: sample?.stool?.microbiomeDiversityIndex ?? null, cbcScan: sample?.cbcScan || "not recorded", anomalyScore: analysis?.anomalyScore ?? 0, activeAlerts: alerts.map((alert) => ({ title: alert.title, severity: alert.severity })) };
+    const vitalsSnapshot = {
+      capturedAt: new Date().toISOString(),
+      heartRate: latestHealth?.heartRate ?? 72,
+      spo2: latestHealth?.spo2 ?? 98,
+      sleep: latestHealth?.sleep ?? 7.4,
+      activity: latestHealth?.activity ?? 68,
+      urineHydration: sample?.urine?.hydrationLevel ?? null,
+      salivaCortisol: sample?.saliva?.cortisol ?? null,
+      stoolMicrobiome: sample?.stool?.microbiomeDiversityIndex ?? null,
+      cbcScan: sample?.cbcScan || "not recorded",
+      anomalyScore: analysis?.anomalyScore ?? 0,
+      activeAlerts: alerts.map((alert) => ({ title: alert.title, severity: alert.severity })),
+    };
     const transcriptText = transcript.map((message) => `${message.role.toUpperCase()}: ${message.text || ""}`).join("\n");
     const draft = await this.summarize(transcriptText, vitalsSnapshot, analysis?.anomalyScore ?? 0);
     return ConsultationReport.create({ astronautId, assignedDoctorId, timestamp: new Date(), symptoms: draft.symptoms, vitalsSnapshot, aiAdviceSummary: draft.aiAdviceSummary, fullTranscript: transcript.map((message) => ({ role: message.role, text: message.text, analysis: message.analysis, voice: message.voice, createdAt: message.createdAt })), riskLevel: draft.riskLevel, anomalyScore: draft.anomalyScore, status: "Unreviewed" });

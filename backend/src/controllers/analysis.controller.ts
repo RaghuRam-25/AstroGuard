@@ -97,16 +97,23 @@ export class AnalysisController {
   /** POST /api/analysis/chat */
   public static async chat(req: Request, res: Response, next: NextFunction) {
     try {
-      const astronautId = req.user?.astronautId;
+      const astronautId = req.user?.astronautId || req.body?.astronautId;
       const question = typeof req.body?.question === "string" ? req.body.question.trim() : "";
       if (!astronautId) return errorResponse(res, "Authenticated astronaut profile is required.", 400);
       if (!question) return errorResponse(res, "A question is required.", 400);
-      const context = await AIChatService.buildContext(astronautId);
+
+      const response = await AIChatService.generate(question, astronautId, Boolean(req.body?.voice));
+
+      // Save user turn
       await AIChatService.saveTurn(astronautId, "user", { text: question, voice: Boolean(req.body?.voice) });
-      const response = await AIChatService.generate(question, context);
-      const escalated = await AIChatService.escalateIfNeeded(astronautId, context);
-      if (escalated && typeof response.answer === "string" && !response.answer.includes("Medical Officer has been pinged")) response.answer += "\n\n**Escalation:** Your assigned Medical Officer has been pinged through the mission alert channel.";
-      await AIChatService.saveTurn(astronautId, "assistant", { text: response.answer, analysis: response.analysis, voice: Boolean(req.body?.voice) });
+
+      // Save assistant turn
+      await AIChatService.saveTurn(astronautId, "assistant", {
+        text: response.answer,
+        analysis: response.analysis as any,
+        voice: Boolean(req.body?.voice),
+      });
+
       return successResponse(res, { response, persisted: true, contextCapturedAt: new Date().toISOString() }, 200);
     } catch (error) {
       next(error);

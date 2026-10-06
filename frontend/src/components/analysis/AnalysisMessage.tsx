@@ -5,6 +5,7 @@ import { cn } from "@/lib/utils";
 import type { ChatMessage } from "@/lib/analysisChat";
 import { speechTextFor } from "@/lib/analysisChat";
 import AnalysisResponseCard from "./AnalysisResponseCard";
+import MarkdownMessage from "./MarkdownMessage";
 import type { PlaybackController } from "@/hooks/useSpeechPlayback";
 
 interface AnalysisMessageProps {
@@ -27,9 +28,9 @@ export default function AnalysisMessage({ message, playback, onQuickQuestion }: 
   }
 
   const hasAnalysis = Boolean(message.analysis);
-  const analysis = message.analysis;
   const speechId = message.id;
   const isSpeaking = playback.isSpeaking(speechId);
+  const vocalContent = message.text || (message.analysis ? speechTextFor(message.analysis) : "");
 
   return (
     <div className="flex items-start gap-3">
@@ -37,7 +38,8 @@ export default function AnalysisMessage({ message, playback, onQuickQuestion }: 
         <Brain className="h-4 w-4 text-primary" />
       </span>
 
-      <div className="min-w-0 flex-1 space-y-2">
+      <div className="min-w-0 flex-1 space-y-3">
+        {/* Header bar */}
         <div className="flex items-center justify-between gap-2">
           <div className="flex items-center gap-2">
             <p className="text-xs font-bold text-white">AstroGuard AI</p>
@@ -48,13 +50,13 @@ export default function AnalysisMessage({ message, playback, onQuickQuestion }: 
           </div>
 
           <div className="flex items-center gap-2">
-            {hasAnalysis && playback.supported && analysis && (
+            {playback.supported && vocalContent && (
               <button
                 type="button"
                 onClick={() =>
                   isSpeaking
                     ? playback.stop()
-                    : playback.speak(speechId, speechTextFor(analysis))
+                    : playback.speak(speechId, speechTextFor(vocalContent))
                 }
                 title={isSpeaking ? "Stop voice playback" : "Play voice response"}
                 className={cn(
@@ -77,16 +79,21 @@ export default function AnalysisMessage({ message, playback, onQuickQuestion }: 
           </div>
         </div>
 
-        {hasAnalysis && message.analysis ? (
-          <AnalysisResponseCard analysis={message.analysis} />
-        ) : (
-          <div className="rounded-2xl border border-sky-400/10 bg-card-secondary/30 px-4 py-3">
-            <p className="text-sm leading-relaxed text-slate-300">{message.text}</p>
+        {/* Natural conversational text bubble */}
+        {message.text && (
+          <div className="rounded-2xl border border-sky-400/10 bg-card-secondary/30 px-4 py-3.5 shadow-sm">
+            <MarkdownMessage content={message.text} />
           </div>
         )}
 
+        {/* Optional structured analysis card (rendered when health analysis is explicitly present) */}
+        {hasAnalysis && message.analysis && (
+          <AnalysisResponseCard analysis={message.analysis} />
+        )}
+
+        {/* Follow-up suggestions */}
         {message.analysis?.followUps && message.analysis.followUps.length > 0 && (
-          <div className="flex flex-wrap gap-2">
+          <div className="flex flex-wrap gap-2 pt-1">
             {message.analysis.followUps.map((followUp) => (
               <button
                 key={followUp}

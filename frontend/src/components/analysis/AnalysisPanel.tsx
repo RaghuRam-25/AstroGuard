@@ -15,26 +15,21 @@ import ChatInputBar from "./ChatInputBar";
 const SEED_QUESTION = "Here is my latest health data. Am I okay?";
 
 function buildSeedConversation(): ChatMessage[] {
-  const analysis = generateAnalysisReply(SEED_QUESTION, LATEST_SNAPSHOT);
-  analysis.id = "seed-analysis-1";
   return [
     {
-      id: "seed-question",
-      role: "user",
-      text: SEED_QUESTION,
-      createdAt: 1745841300000,
-    },
-    {
-      id: "seed-answer",
+      id: "seed-welcome",
       role: "assistant",
-      text: "Based on your latest telemetry, here is what I found.",
-      analysis,
-      createdAt: 1745841350000,
+      text: "Hello! I am your AstroGuard AI Assistant. I can assist with mission updates, technical questions, telemetry queries, or complete health analyses. How can I help you today?",
+      createdAt: Date.now() - 60000,
     },
   ];
 }
 
-async function resolveReply(text: string, astronautId: string, voice = false): Promise<AnalysisResponse> {
+async function resolveReply(
+  text: string,
+  astronautId: string,
+  voice = false
+): Promise<{ answer: string; analysis?: AnalysisResponse | null }> {
   try {
     const res = await postAnalysisChat({
       astronautId: astronautId || "AST-001",
@@ -43,13 +38,18 @@ async function resolveReply(text: string, astronautId: string, voice = false): P
       voice,
     });
     if (res.success && res.data) {
-      const payload = res.data as { response?: AnalysisResponse };
-      if (payload.response) return payload.response;
+      const payload = res.data as { response?: { answer?: string; analysis?: AnalysisResponse | null } };
+      if (payload.response?.answer) {
+        return {
+          answer: payload.response.answer,
+          analysis: payload.response.analysis || null,
+        };
+      }
     }
   } catch {
     // backend unreachable — demo fallback below
   }
-  await new Promise((resolve) => setTimeout(resolve, 900 + Math.random() * 400));
+  await new Promise((resolve) => setTimeout(resolve, 400));
   return generateAnalysisReply(text, LATEST_SNAPSHOT);
 }
 
@@ -70,7 +70,9 @@ export default function AnalysisPanel() {
     void getAnalysisChatHistory().then((res) => {
       if (!active || !res.success || !res.data) return;
       const persisted = (res.data as { messages?: Array<ChatMessage & { _id?: string }> }).messages;
-      if (persisted?.length) setMessages(persisted.map((message) => ({ ...message, id: String(message._id || message.id || `history-${message.createdAt}`) })));
+      if (persisted?.length) {
+        setMessages(persisted.map((message) => ({ ...message, id: String(message._id || message.id || `history-${message.createdAt}`) })));
+      }
     });
     return () => { active = false; };
   }, []);
@@ -97,14 +99,14 @@ export default function AnalysisPanel() {
 
   const pushAssistant = (
     text: string,
-    analysis?: AnalysisResponse,
+    analysis?: AnalysisResponse | null,
     voice = false
   ): ChatMessage => {
     return {
       id: `answer-${Date.now().toString(36)}`,
       role: "assistant",
       text,
-      analysis,
+      analysis: analysis || undefined,
       voice,
       createdAt: Date.now(),
     };
@@ -128,7 +130,7 @@ export default function AnalysisPanel() {
     setTyping(true);
 
     const reply = await resolveReply(text, user?.astronautId || "AST-001", voice);
-    const assistantMessage = pushAssistant("Based on your latest telemetry, here is what I found.", reply, voice);
+    const assistantMessage = pushAssistant(reply.answer, reply.analysis, voice);
 
     setMessages((prev) => [...prev, assistantMessage]);
     setTyping(false);
@@ -136,7 +138,7 @@ export default function AnalysisPanel() {
 
     if (playback.voiceMode) {
       window.setTimeout(() => {
-        playback.speak(assistantMessage.id, speechTextFor(reply));
+        playback.speak(assistantMessage.id, speechTextFor(assistantMessage.text || reply.analysis || ""));
       }, 150);
     }
   };

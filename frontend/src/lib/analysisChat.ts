@@ -1,6 +1,6 @@
 // AI Analysis assistant — domain types, mock fallback engine, and payload builders.
 // When the backend is reachable, the page posts to /api/analysis/chat and uses the
-// returned response. Everything in this module only acts as a typed demo fallback.
+// returned Gemini / AI response. Everything in this module acts as a typed fallback.
 
 export interface LatestHealthSnapshot {
   heartRate: number;
@@ -67,12 +67,12 @@ export interface ChatMessage {
   id: string;
   role: "user" | "assistant";
   text?: string;
-  analysis?: AnalysisResponse;
+  analysis?: AnalysisResponse | null;
   voice?: boolean;
   createdAt: number;
 }
 
-const MODEL = "Isolation Forest";
+const MODEL = "AstroGuard Grounded Health Intelligence";
 
 function personalBaseline(s: LatestHealthSnapshot): BaselineMetric[] {
   return [
@@ -191,23 +191,23 @@ const DEFAULT_RECOMMENDATIONS: Recommendation[] = [
 ];
 
 const DEFAULT_EXPLANATION =
-  "I compared your latest reading against your personal 14-day baseline and the ARES-01 mission baseline using an Isolation Forest model. No signal crossed the anomaly threshold — the whole-body anomaly score is 18/100 (Low). Your physiology is operating nominally for Mission Day 142.";
+  "I compared your latest reading against your personal 14-day baseline and the ARES-01 mission baseline. No signal crossed the anomaly threshold — the whole-body anomaly score is 18/100 (Low). Your physiology is operating nominally.";
 
 function followUps(): string[] {
   return [
+    "What do my latest trends show?",
+    "How can I improve my hydration?",
     "Why is my heart rate elevated?",
-    "How can I improve my sleep?",
-    "What do my trends show?",
   ];
 }
 
-function buildResponse(
+export function buildResponse(
   s: LatestHealthSnapshot,
   overrides: Partial<AnalysisResponse> = {}
 ): AnalysisResponse {
   return {
     id: `analysis-${Date.now().toString(36)}`,
-    createdAt: "Apr 28, 2025 · 06:15 UTC",
+    createdAt: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
     status: "LOW",
     statusLabel: "Low risk",
     anomalyScore: 18,
@@ -223,156 +223,98 @@ function buildResponse(
   };
 }
 
-function heartRateFindings(s: LatestHealthSnapshot): KeyFinding[] {
-  return [
-    {
-      metric: "heartRate",
-      label: "Heart Rate",
-      severity: "Elevated",
-      detail: "72 BPM is within range but trending above your 70.5 BPM personal average.",
-      value: `${s.heartRate} BPM`,
-      range: "60-100 BPM",
-    },
-    {
-      metric: "spo2",
-      label: "SpO₂",
-      severity: "Normal",
-      detail: "Oxygen saturation remains stable.",
-      value: `${s.spo2}%`,
-      range: "95-100%",
-    },
-    DEFAULT_FINDINGS[2],
-    DEFAULT_FINDINGS[3],
-  ];
-}
-
-function sleepFindings(s: LatestHealthSnapshot): KeyFinding[] {
-  return [
-    {
-      metric: "sleep",
-      label: "Sleep Duration",
-      severity: "Watch",
-      detail: "7.4 hrs is 0.2 hrs below your recent 14-day average of 7.6 hrs.",
-      value: `${s.sleep} hrs`,
-      range: "7-9 hrs",
-    },
-    DEFAULT_FINDINGS[0],
-    DEFAULT_FINDINGS[1],
-    DEFAULT_FINDINGS[3],
-  ];
-}
-
-function trendsFindings(s: LatestHealthSnapshot): KeyFinding[] {
-  return [
-    DEFAULT_FINDINGS[0],
-    DEFAULT_FINDINGS[1],
-    {
-      metric: "sleep",
-      label: "Sleep Duration",
-      severity: "Normal",
-      detail: "Seven-day sleep trend is recovering toward your personal average.",
-      value: `${s.sleep} hrs`,
-      range: "7-9 hrs",
-    },
-    {
-      metric: "activity",
-      label: "Activity Level",
-      severity: "Normal",
-      detail: "Activity cadence consistent with EVA recovery windows.",
-      value: `${s.activity}%`,
-      range: "50-85%",
-    },
-  ];
-}
-
-function sleepRecommendations(): Recommendation[] {
-  return [
-    {
-      title: "Light exposure reset",
-      detail: "Align with the mission 22:00 UTC lights-out protocol to anchor circadian rhythm.",
-    },
-    {
-      title: "Wind-down routine",
-      detail: "Reduce blue-light exposure and screen time 45 minutes before rest.",
-    },
-    {
-      title: "Recovery window",
-      detail: "Add one rest cycle this mission day to recover the 0.2 hr deficit.",
-    },
-  ];
-}
-
-function heartRateRecommendations(): Recommendation[] {
-  return [
-    {
-      title: "Resting measurement",
-      detail: "Take a seated resting reading 10 minutes into your next wake window.",
-    },
-    {
-      title: "Hydration",
-      detail: "Confirm hydration protocol compliance, monitor over the next 6 hours.",
-    },
-    {
-      title: "EVA sequencing",
-      detail: "Schedule the next surface EVA after heart rate returns below 74 BPM.",
-    },
-  ];
-}
-
 export function generateAnalysisReply(
   question: string,
   s: LatestHealthSnapshot
-): AnalysisResponse {
-  const q = question.toLowerCase();
+): { answer: string; analysis?: AnalysisResponse | null } {
+  const q = question.toLowerCase().trim();
+  const cleanQ = q.replace(/[?!.,;:']/g, " ").replace(/\s+/g, " ").trim();
 
-  if (q.includes("sleep")) {
-    return buildResponse(s, {
-      status: "WATCH",
-      statusLabel: "Watch",
-      anomalyScore: 34,
-      confidence: 91.7,
-      keyFindings: sleepFindings(s),
-      recommendations: sleepRecommendations(),
-      explanation:
-        "Sleep duration is the only signal outside your 14-day personal average. I compared your 7.4 hrs against a 7.6 hrs personal baseline and the 7.0 hrs mission standard. The Isolation Forest model flags this as a mild deviation, not an anomaly. Recovery-focused adjustments should normalize the trend within the next mission day.",
-    });
+  // 1. General conversation
+  if (
+    cleanQ === "hi" || cleanQ === "hello" || cleanQ === "hey" ||
+    cleanQ.includes("how are you") || cleanQ.includes("who are you") ||
+    cleanQ.includes("what can you do") || cleanQ.includes("joke") || cleanQ.includes("thank")
+  ) {
+    if (cleanQ.includes("how are you")) {
+      return {
+        answer: "I'm doing well, thank you for asking! All systems are operational and I'm ready to assist you. What would you like to know?",
+        analysis: null,
+      };
+    }
+    if (cleanQ.includes("joke")) {
+      return {
+        answer: "Why did the astronaut break up with the alien? Because they needed a little more space! 🚀",
+        analysis: null,
+      };
+    }
+    return {
+      answer: "Hello! I am your AstroGuard AI Assistant. How can I help you today?",
+      analysis: null,
+    };
   }
 
-  if (q.includes("heart rate") || q.includes("elevated") || q.includes("palp") || q.includes("hr ")) {
-    return buildResponse(s, {
-      status: "WATCH",
-      statusLabel: "Watch",
-      anomalyScore: 31,
-      confidence: 93.1,
-      keyFindings: heartRateFindings(s),
-      recommendations: heartRateRecommendations(),
-      explanation:
-        "Your heart rate of 72 BPM sits above the 70.5 BPM personal baseline but well inside the 60-100 BPM clinical range. SpO₂, sleep and activity show no correlated anomalies. Elevated readings of this magnitude are commonly explained by hydration state, recent physical load or EVA scheduling. The model currently rates this as Watch — not a risk to mission readiness.",
-    });
+  // 2. Specific single metrics
+  if (cleanQ.includes("heart rate") || cleanQ.includes("pulse") || cleanQ.includes("hr")) {
+    return {
+      answer: `Based on the latest data in AstroGuard, your current heart rate is **${s.heartRate} BPM** (nominal resting range: 60–100 BPM).`,
+      analysis: null,
+    };
   }
 
-  if (q.includes("trend")) {
-    return buildResponse(s, {
-      status: "LOW",
-      statusLabel: "Low risk",
-      anomalyScore: 21,
-      confidence: 93.8,
-      keyFindings: trendsFindings(s),
-      recommendations: DEFAULT_RECOMMENDATIONS,
-      explanation:
-        "Over the last 14 days your signals track a consistent, recoverable pattern. Heart rate oscillates ±3 BPM around 72 due to EVA activity; SpO₂ holds a flat 98%; sleep recovered from 7.1 to 7.4 hrs after the last surface operation; activity alternates between suit telemetry and manual entry with no drift. The anomaly score of 21/100 is Low.",
-    });
+  if (cleanQ.includes("spo2") || cleanQ.includes("oxygen")) {
+    return {
+      answer: `Based on the latest data in AstroGuard, your blood oxygen saturation (SpO₂) is **${s.spo2}%** (nominal range: 95–100%).`,
+      analysis: null,
+    };
   }
 
-  return buildResponse(s);
+  if (cleanQ.includes("sleep")) {
+    return {
+      answer: `Based on your latest records in AstroGuard, your sleep duration is **${s.sleep} hours** (mission target: 7.0–9.0 hours).`,
+      analysis: null,
+    };
+  }
+
+  if (cleanQ.includes("hydration") || cleanQ.includes("water")) {
+    return {
+      answer: "Based on current AstroGuard records, your estimated daily fluid intake is **1.65 L** against your **2.80 L** target (59% completed). Hydration status remains nominal.",
+      analysis: null,
+    };
+  }
+
+  // 3. General knowledge / science
+  if (cleanQ.includes("dijkstra") || cleanQ.includes("algorithm") || cleanQ.includes("gravity") || cleanQ.includes("machine learning") || cleanQ.includes("photosynthesis")) {
+    if (cleanQ.includes("dijkstra")) {
+      return {
+        answer: "**Dijkstra's Algorithm** finds the shortest paths between nodes in a weighted graph with non-negative edge weights using a greedy priority queue approach.",
+        analysis: null,
+      };
+    }
+    return {
+      answer: `Here is information on **${question}**: This is a fundamental concept in science and computation.`,
+      analysis: null,
+    };
+  }
+
+  // 4. Holistic health analysis
+  const analysis = buildResponse(s);
+  return {
+    answer: "### Health Status Analysis\n\nBased on your latest data in AstroGuard, all primary biometrics (Heart Rate, SpO₂, Sleep, Activity) are nominal and consistent with mission baselines.",
+    analysis,
+  };
 }
 
-export function speechTextFor(response: AnalysisResponse): string {
-  const findings = response.keyFindings
+export function speechTextFor(analysisOrText: AnalysisResponse | string): string {
+  if (typeof analysisOrText === "string") {
+    // strip markdown asterisks/headers for clean speech
+    return analysisOrText.replace(/[#*`_]/g, "").trim();
+  }
+  const findings = (analysisOrText.keyFindings || [])
     .map((f) => `${f.label}: ${f.detail}`)
     .join(". ");
-  const recommendations = response.recommendations
+  const recommendations = (analysisOrText.recommendations || [])
     .map((r) => `${r.title}. ${r.detail}`)
     .join(". ");
-  return `Overall health status ${response.statusLabel}. Anomaly score ${response.anomalyScore} out of 100. Confidence ${response.confidence} percent. Key findings. ${findings}. Recommendations. ${recommendations}.`;
+  return `Overall health status ${analysisOrText.statusLabel}. Anomaly score ${analysisOrText.anomalyScore} out of 100. Key findings: ${findings}. Recommendations: ${recommendations}.`;
 }
