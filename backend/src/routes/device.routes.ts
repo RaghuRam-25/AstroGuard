@@ -206,7 +206,7 @@ router.post("/pair", authenticate, async (req: Request, res: Response) => {
       existing.lastSeen = new Date();
       existing.pairedAt = new Date();
       await existing.save();
-      return successResponse(res, existing, "Device re-connected and paired successfully", 200);
+      return successResponse(res, existing, 200, "Device re-connected and paired successfully");
     }
 
     const newDevice = await AstronautDevice.create({
@@ -230,7 +230,7 @@ router.post("/pair", authenticate, async (req: Request, res: Response) => {
       assignedSensors,
     });
 
-    return successResponse(res, newDevice, "Device paired successfully with Bio-Link Gateway", 201);
+    return successResponse(res, newDevice, 201, "Device paired successfully with Bio-Link Gateway");
   } catch (error: any) {
     return errorResponse(res, error.message || "Failed to pair device", 500);
   }
@@ -262,7 +262,7 @@ router.patch("/:id/status", authenticate, async (req: Request, res: Response) =>
     device.lastSeen = new Date();
 
     await device.save();
-    return successResponse(res, device, "Device telemetry status updated");
+    return successResponse(res, device, 200, "Device telemetry status updated");
   } catch (error: any) {
     return errorResponse(res, error.message || "Failed to update device status", 500);
   }
@@ -290,7 +290,7 @@ router.delete("/:id", authenticate, async (req: Request, res: Response) => {
     device.status = "offline";
     await device.save();
 
-    return successResponse(res, { deviceId: device.deviceId }, "Device unpaired from Bio-Link Gateway");
+    return successResponse(res, { deviceId: device.deviceId }, 200, "Device unpaired from Bio-Link Gateway");
   } catch (error: any) {
     return errorResponse(res, error.message || "Failed to unpair device", 500);
   }
@@ -306,7 +306,7 @@ router.post("/sync-buffered", authenticate, async (req: Request, res: Response) 
     const { packets = [] } = req.body;
 
     if (!Array.isArray(packets) || packets.length === 0) {
-      return successResponse(res, { ingestedCount: 0 }, "No buffered packets to synchronize");
+      return successResponse(res, { ingestedCount: 0 }, 200, "No buffered packets to synchronize");
     }
 
     let ingestedCount = 0;
@@ -323,6 +323,7 @@ router.post("/sync-buffered", authenticate, async (req: Request, res: Response) 
     return successResponse(
       res,
       { ingestedCount, syncTimestamp: new Date().toISOString() },
+      200,
       `Successfully synced ${ingestedCount} buffered telemetry packets from Bio-Link Gateway.`
     );
   } catch (error: any) {

@@ -13,7 +13,8 @@ export type ConnectionProtocol = "ble" | "usb" | "wifi" | "gateway";
 export type DeviceStatus = "connected" | "offline" | "unstable" | "stale" | "pairing";
 export type SignalQuality = "excellent" | "good" | "weak" | "offline";
 
-export interface IAstronautDevice extends Document {
+export interface IAstronautDevice {
+  _id?: string;
   deviceId: string;
   astronautId: string;
   deviceType: DeviceType;
