@@ -33,8 +33,8 @@ import {
   submitClinicalReview,
 } from "../../lib/api";
 import { useAuth } from "../../context/AuthContext";
+import { useCall } from "../../context/CallContext";
 import { LoadingState, EmptyState } from "../shared/LoadingState";
-import CallModal from "./CallModal";
 import { CommunicationPeer, CrewMember, MedicalAlert, TriageLevel, triageFromRisk, triageFromSeverity } from "./types";
 
 type FilterKey = "All" | "CRITICAL" | "WARNING" | "NOMINAL";
@@ -60,6 +60,7 @@ function timeAgo(value?: string): string {
 
 export default function MedicalOfficerDashboard() {
   const { user } = useAuth();
+  const { startCall } = useCall();
   const router = useRouter();
   const [crew, setCrew] = useState<CrewMember[]>([]);
   const [loadingCrew, setLoadingCrew] = useState(true);
@@ -180,19 +181,20 @@ export default function MedicalOfficerDashboard() {
 
   const openCall = (type: "Audio" | "Video") => {
     if (!selectedCrew) { showToast("Select an assigned astronaut to begin the link."); return; }
-    const callerId = user?.id;
-    if (!callerId) { showToast("Session could not be resolved. Please re-authenticate."); return; }
-    const receiver = selectedPeer;
+    const receiver = selectedPeer || peers.find((p) => p.astronautId === selectedCrew.astronautId || p.name === selectedCrew.name);
     if (!receiver?.id) {
-      showToast("Astronaut is currently offline. Telemedicine link unavailable.");
+      showToast("Astronaut session not resolved. Reconnecting telemedicine link...");
       return;
     }
-    const receiverId = receiver.id;
-    const roomSlug = `telemedicine-${callerId}-${receiverId}`;
-    setCallMeta({ callerId, receiverId, roomSlug });
-    setCallType(type);
-    setCallSequence((current) => current + 1);
-    setCallOpen(true);
+    void startCall(
+      {
+        id: receiver.id,
+        name: selectedCrew.name,
+        role: "astronaut",
+        astronautId: selectedCrew.astronautId,
+      },
+      type
+    );
   };
 
   const handleFlagMissionControl = async (alert: MedicalAlert) => {
@@ -766,20 +768,6 @@ export default function MedicalOfficerDashboard() {
           <CheckCircle2 className="h-4 w-4" />
           <span>{toast}</span>
         </div>
-      )}
-
-      {/* Call Modal */}
-      {selectedPeer && callMeta && (
-        <CallModal
-          key={callSequence}
-          open={callOpen}
-          peerId={callMeta.receiverId}
-          peerName={selectedCrew?.name || selectedPeer.name}
-          callType={callType}
-          callerId={callMeta.callerId}
-          roomSlug={callMeta.roomSlug}
-          onClose={() => setCallOpen(false)}
-        />
       )}
     </div>
   );

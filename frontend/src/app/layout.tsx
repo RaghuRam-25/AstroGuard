@@ -3,6 +3,7 @@ import { Analytics } from "@vercel/analytics/react";
 import { SpeedInsights } from "@vercel/speed-insights/next";
 import { AuthProvider } from "../context/AuthContext";
 import { RegistrationProvider } from "../context/RegistrationContext";
+import { CallProvider } from "../context/CallContext";
 import AppLayout from "./components/AppLayout";
 import CosmicSpaceBackground from "../components/shared/CosmicSpaceBackground";
 import "./index.css";
@@ -23,9 +24,11 @@ export default function RootLayout({
       <body className="min-h-full bg-[#020817] text-white relative">
         <CosmicSpaceBackground />
         <AuthProvider>
-          <RegistrationProvider>
-            <AppLayout>{children}</AppLayout>
-          </RegistrationProvider>
+          <CallProvider>
+            <RegistrationProvider>
+              <AppLayout>{children}</AppLayout>
+            </RegistrationProvider>
+          </CallProvider>
         </AuthProvider>
         <Analytics />
         <SpeedInsights />

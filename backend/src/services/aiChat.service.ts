@@ -59,17 +59,113 @@ export class AIChatService {
 
   static async generate(question: string, context: Context) {
     const base = AIChatService.fallback(question, context);
-    const apiKey = env.AI_API_KEY || process.env.OPENAI_API_KEY;
-    const baseUrl = env.AI_API_BASE_URL || process.env.OPENAI_API_BASE;
-    if (!apiKey || !baseUrl) return base;
+    const apiKey = env.AI_API_KEY || process.env.OPENAI_API_KEY || env.GEMINI_API_KEY || process.env.GEMINI_API_KEY;
+    const baseUrl = env.AI_API_BASE_URL || process.env.OPENAI_API_BASE || "https://api.openai.com/v1";
+    
+    if (!apiKey) {
+      console.log("ℹ️ [AIChatService] AI_API_KEY not configured. Utilizing grounded telemetry clinical decision engine.");
+      return base;
+    }
+
+    // Google Gemini API pathway
+    if (apiKey.startsWith("AIza") || env.GEMINI_API_KEY || process.env.GEMINI_API_KEY) {
+      try {
+        const geminiKey = env.GEMINI_API_KEY || process.env.GEMINI_API_KEY || apiKey;
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), 15000);
+        
+        const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${geminiKey}`;
+        const res = await fetch(geminiUrl, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          signal: controller.signal,
+          body: JSON.stringify({
+            contents: [
+              {
+                parts: [
+                  { text: `${SYSTEM_PROMPT}\n\nAstronaut Live Context:\n${JSON.stringify(context)}\n\nAstronaut Query:\n${question}` }
+                ]
+              }
+            ],
+            generationConfig: {
+              responseMimeType: "application/json",
+              temperature: 0.2,
+              maxOutputTokens: 1400
+            }
+          })
+        });
+        clearTimeout(timeout);
+
+        if (res.ok) {
+          const data = await res.json() as { candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }> };
+          const text = data.candidates?.[0]?.content?.parts?.[0]?.text || "";
+          const parsed = parseJson(text);
+          if (parsed && typeof parsed.answer === "string") {
+            return {
+              answer: parsed.answer,
+              analysis: {
+                ...base.analysis,
+                ...(parsed.analysis || {}),
+                id: parsed.analysis?.id || base.analysis.id,
+                createdAt: parsed.analysis?.createdAt || base.analysis.createdAt,
+              }
+            };
+          }
+        }
+      } catch (err: any) {
+        console.warn("⚠️ [AIChatService] Gemini request failed, using telemetry engine fallback:", err.message);
+      }
+    }
+
+    // OpenAI-compatible pathway
     try {
-      const response = await fetch(`${baseUrl.replace(/\/$/, "")}/chat/completions`, { method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${apiKey}` }, body: JSON.stringify({ model: env.AI_MODEL, temperature: 0.2, max_completion_tokens: 1400, messages: [{ role: "system", content: SYSTEM_PROMPT }, { role: "user", content: `Logged-in astronaut context (private, use only for this response):\n${JSON.stringify(context)}\n\nAstronaut question:\n${question}` }] }) });
-      if (!response.ok) return base;
-      const payload = await response.json() as { choices?: Array<{ message?: { content?: string } }> };
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 15000);
+
+      const response = await fetch(`${baseUrl.replace(/\/$/, "")}/chat/completions`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${apiKey}`,
+        },
+        signal: controller.signal,
+        body: JSON.stringify({
+          model: env.AI_MODEL || "gpt-4o-mini",
+          temperature: 0.2,
+          max_completion_tokens: 1400,
+          messages: [
+            { role: "system", content: SYSTEM_PROMPT },
+            {
+              role: "user",
+              content: `Logged-in astronaut context (private, use only for this response):\n${JSON.stringify(context)}\n\nAstronaut question:\n${question}`,
+            },
+          ],
+        }),
+      });
+      clearTimeout(timeout);
+
+      if (!response.ok) {
+        console.warn(`⚠️ [AIChatService] AI Provider error HTTP ${response.status}. Using grounded fallback.`);
+        return base;
+      }
+
+      const payload = (await response.json()) as { choices?: Array<{ message?: { content?: string } }> };
       const parsed = parseJson(payload.choices?.[0]?.message?.content || "");
       if (!parsed?.analysis || typeof parsed.answer !== "string") return base;
-      return { answer: parsed.answer, analysis: { ...base.analysis, ...parsed.analysis, id: parsed.analysis.id || base.analysis.id, createdAt: parsed.analysis.createdAt || base.analysis.createdAt } };
-    } catch { return base; }
+
+      return {
+        answer: parsed.answer,
+        analysis: {
+          ...base.analysis,
+          ...parsed.analysis,
+          id: parsed.analysis.id || base.analysis.id,
+          createdAt: parsed.analysis.createdAt || base.analysis.createdAt,
+        },
+      };
+    } catch (err: any) {
+      console.warn("⚠️ [AIChatService] AI API call exception:", err.message);
+      return base;
+    }
   }
 
   static async saveTurn(astronautId: string, role: "user" | "assistant", data: { text?: string; analysis?: Record<string, unknown>; voice?: boolean }) { return ChatMessage.create({ astronautId, role, text: data.text || "", analysis: data.analysis, voice: Boolean(data.voice) }); }

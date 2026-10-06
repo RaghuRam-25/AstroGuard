@@ -61,7 +61,6 @@ export function attachCommunicationSocket(server: HttpServer) {
       }
 
       // STRICT ROLE RESTRICTION: Voice/video calling & telemedicine chat is Astronaut <-> Doctor ONLY.
-      // Mission Control and other unauthorized roles cannot connect to the communication socket.
       if (!["astronaut", "medical_officer"].includes(user.role)) {
         return next(new Error("Calling and direct communication is restricted to Astronauts and Medical Officers only."));
       }
@@ -83,7 +82,7 @@ export function attachCommunicationSocket(server: HttpServer) {
     const userId = user._id.toString();
     socket.join(`user:${userId}`);
     await emitPresence(user, true);
-    socket.emit("communication:ready", { userId });
+    socket.emit("communication:ready", { userId, role: user.role, name: user.name, astronautId: user.astronautId });
 
     socket.on("chat:send", async (payload: { receiverId?: string; message?: string; messageType?: string; attachments?: unknown[] }) => {
       const receiverId = String(payload?.receiverId || "");
@@ -94,19 +93,20 @@ export function attachCommunicationSocket(server: HttpServer) {
       if (!message && !attachments.length) return;
       const saved = await MedicalChat.create({
         senderId: userId,
-        receiverId,
+        receiverId: peer.id,
         message,
         messageType: payload.messageType === "voice" ? "voice" : attachments.length && !message ? "file" : "text",
         attachments,
       });
       const messagePayload = saved.toObject();
-      io.to(`user:${userId}`).to(`user:${receiverId}`).emit("chat:message", messagePayload);
+      io.to(`user:${userId}`).to(`user:${peer.id}`).emit("chat:message", messagePayload);
     });
 
     socket.on("chat:typing", async (payload: { receiverId?: string; typing?: boolean }) => {
       const receiverId = String(payload?.receiverId || "");
-      if (await getCommunicationPeer(user, receiverId)) {
-        io.to(`user:${receiverId}`).emit("chat:typing", { senderId: userId, typing: Boolean(payload.typing) });
+      const peer = await getCommunicationPeer(user, receiverId);
+      if (peer) {
+        io.to(`user:${peer.id}`).emit("chat:typing", { senderId: userId, typing: Boolean(payload.typing) });
       }
     });
 
@@ -118,7 +118,14 @@ export function attachCommunicationSocket(server: HttpServer) {
     });
 
     // ── Calling Signaling: Astronaut <-> Doctor ONLY ───────────────────
-    socket.on("call:invite", async (payload: { receiverId?: string; callerId?: string; callType?: "Audio" | "Video"; roomSlug?: string; offer?: unknown }) => {
+    socket.on("call:invite", async (payload: {
+      callId?: string;
+      receiverId?: string;
+      callerId?: string;
+      callType?: "Audio" | "Video";
+      roomSlug?: string;
+      offer?: unknown;
+    }) => {
       const receiverId = String(payload?.receiverId || "");
       const peer = await getCommunicationPeer(user, receiverId);
       if (!peer) {
@@ -133,21 +140,124 @@ export function attachCommunicationSocket(server: HttpServer) {
         return socket.emit("communication:error", { message: "Medical Officers can only call assigned Astronauts." });
       }
 
-      const roomSlug = typeof payload?.roomSlug === "string" ? payload.roomSlug.slice(0, 160) : undefined;
-      io.to(`user:${receiverId}`).emit("call:incoming", {
+      const callId = payload?.callId || `CALL-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+      const roomSlug = typeof payload?.roomSlug === "string" ? payload.roomSlug.slice(0, 160) : `telemedicine-${userId}-${peer.id}`;
+      const callType = payload.callType === "Video" ? "Video" : "Audio";
+
+      // Emit incoming call to the peer's socket room
+      io.to(`user:${peer.id}`).emit("call:incoming", {
+        callId,
         callerId: userId,
         callerName: user.name,
         callerRole: user.role,
-        callType: payload.callType === "Video" ? "Video" : "Audio",
+        callerAstronautId: user.astronautId,
+        callType,
         roomSlug,
         offer: payload.offer,
+        timestamp: new Date().toISOString(),
       });
     });
 
-    socket.on("call:signal", async (payload: { receiverId?: string; callerId?: string; roomSlug?: string; signal?: unknown }) => {
+    socket.on("call:accept", async (payload: {
+      callId?: string;
+      receiverId?: string;
+      roomSlug?: string;
+      answer?: unknown;
+    }) => {
       const receiverId = String(payload?.receiverId || "");
-      if (await getCommunicationPeer(user, receiverId)) {
-        io.to(`user:${receiverId}`).emit("call:signal", {
+      const peer = await getCommunicationPeer(user, receiverId);
+      if (peer) {
+        io.to(`user:${peer.id}`).emit("call:accepted", {
+          callId: payload?.callId,
+          senderId: userId,
+          roomSlug: payload?.roomSlug,
+          answer: payload?.answer,
+        });
+      }
+    });
+
+    socket.on("call:reject", async (payload: {
+      callId?: string;
+      receiverId?: string;
+      roomSlug?: string;
+      reason?: string;
+    }) => {
+      const receiverId = String(payload?.receiverId || "");
+      const peer = await getCommunicationPeer(user, receiverId);
+      if (peer) {
+        io.to(`user:${peer.id}`).emit("call:rejected", {
+          callId: payload?.callId,
+          senderId: userId,
+          roomSlug: payload?.roomSlug,
+          reason: payload?.reason || "Call declined by user",
+        });
+        io.to(`user:${peer.id}`).emit("call:status", {
+          senderId: userId,
+          roomSlug: payload?.roomSlug,
+          status: "Rejected",
+        });
+      }
+    });
+
+    socket.on("call:busy", async (payload: {
+      callId?: string;
+      receiverId?: string;
+      roomSlug?: string;
+    }) => {
+      const receiverId = String(payload?.receiverId || "");
+      const peer = await getCommunicationPeer(user, receiverId);
+      if (peer) {
+        io.to(`user:${peer.id}`).emit("call:busy", {
+          callId: payload?.callId,
+          senderId: userId,
+          roomSlug: payload?.roomSlug,
+          message: `${user.name} is currently on another call.`,
+        });
+        io.to(`user:${peer.id}`).emit("call:status", {
+          senderId: userId,
+          roomSlug: payload?.roomSlug,
+          status: "Busy",
+        });
+      }
+    });
+
+    socket.on("call:end", async (payload: {
+      callId?: string;
+      receiverId?: string;
+      roomSlug?: string;
+      duration?: number;
+    }) => {
+      const receiverId = String(payload?.receiverId || "");
+      const peer = await getCommunicationPeer(user, receiverId);
+      const endPayload = {
+        callId: payload?.callId,
+        senderId: userId,
+        endedBy: user.name,
+        roomSlug: payload?.roomSlug,
+        duration: payload?.duration || 0,
+        timestamp: new Date().toISOString(),
+      };
+      if (peer) {
+        io.to(`user:${peer.id}`).emit("call:ended", endPayload);
+        io.to(`user:${peer.id}`).emit("call:status", {
+          senderId: userId,
+          roomSlug: payload?.roomSlug,
+          status: "Ended",
+        });
+      }
+      socket.emit("call:ended", endPayload);
+    });
+
+    socket.on("call:signal", async (payload: {
+      receiverId?: string;
+      callerId?: string;
+      roomSlug?: string;
+      signal?: unknown;
+    }) => {
+      const receiverId = String(payload?.receiverId || "");
+      const peer = await getCommunicationPeer(user, receiverId);
+      if (peer) {
+        io.to(`user:${peer.id}`).emit("call:signal", {
           senderId: userId,
           roomSlug: payload?.roomSlug,
           signal: payload.signal,
@@ -155,10 +265,16 @@ export function attachCommunicationSocket(server: HttpServer) {
       }
     });
 
-    socket.on("call:status", async (payload: { receiverId?: string; callerId?: string; roomSlug?: string; status?: string }) => {
+    socket.on("call:status", async (payload: {
+      receiverId?: string;
+      callerId?: string;
+      roomSlug?: string;
+      status?: string;
+    }) => {
       const receiverId = String(payload?.receiverId || "");
-      if (await getCommunicationPeer(user, receiverId)) {
-        io.to(`user:${receiverId}`).emit("call:status", {
+      const peer = await getCommunicationPeer(user, receiverId);
+      if (peer) {
+        io.to(`user:${peer.id}`).emit("call:status", {
           senderId: userId,
           roomSlug: payload?.roomSlug,
           status: payload.status,

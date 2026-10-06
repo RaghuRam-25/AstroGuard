@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { io, Socket } from "socket.io-client";
 import { useAuth } from "../../context/AuthContext";
+import { useCall } from "../../context/CallContext";
 import {
   API_BASE_URL,
   getStoredAccessToken,
@@ -233,23 +234,19 @@ export default function MedicalConsultHub() {
     stream.getTracks().forEach((track) => pcRef.current?.addTrack(track, stream));
   }, []);
 
+  const { startCall: initiateGlobalCall } = useCall();
+
   const startCall = async (type: CallType) => {
-    if (!peer || activeCall) return;
-    try {
-      callerRef.current = true;
-      callStartedRef.current = Date.now();
-      callTypeRef.current = type;
-      const pc = preparePeerConnection(peer.id, type);
-      await getLocalMedia(type);
-      const offer = await pc.createOffer();
-      await pc.setLocalDescription(offer);
-      const roomSlug = user?.id ? `telemedicine-${user.id}-${peer.id}` : undefined;
-      socketRef.current?.emit("call:invite", { receiverId: peer.id, callType: type, roomSlug, offer });
-      setActiveCall({ type, caller: true });
-    } catch {
-      setError("Camera or microphone permission was not available.");
-      await closeCall("Cancelled");
-    }
+    if (!peer) return;
+    void initiateGlobalCall(
+      {
+        id: peer.id,
+        name: peer.name,
+        role: peer.role,
+        astronautId: peer.astronautId,
+      },
+      type
+    );
   };
 
   const acceptCall = async () => {
