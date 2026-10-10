@@ -618,5 +618,36 @@ export const unpairDevice = (deviceId: string) =>
 export const syncBufferedTelemetry = (packets: unknown[]) =>
   apiRequest("/api/devices/sync-buffered", { method: "POST", body: JSON.stringify({ packets }) });
 
+// ─────────────────────────────────────────────────────────
+//  NASA Open APIs Integration (api.nasa.gov)
+// ─────────────────────────────────────────────────────────
+
+export interface NasaSpaceWeather {
+  status: "NOMINAL" | "MODERATE_RISK" | "HIGH_RADIATION_ALERT";
+  radiationIndexMsv: number;
+  solarProtonFlux: string;
+  stormShelterRequired: boolean;
+  activeSolarEventsCount: number;
+  recentCMECount: number;
+  recentSEPCount: number;
+  recentGSTCount: number;
+  lastUpdated: string;
+  source: string;
+  alerts: string[];
+}
+
+export interface NasaApod {
+  title: string;
+  explanation: string;
+  url: string;
+  hdurl?: string;
+  date: string;
+  media_type: string;
+}
+
+export const getNasaSpaceWeather = () => apiRequest<NasaSpaceWeather>("/api/nasa/space-weather");
+export const getNasaRadiation = () => apiRequest<NasaSpaceWeather>("/api/nasa/radiation");
+export const getNasaApod = () => apiRequest<NasaApod>("/api/nasa/apod");
+
 
 

@@ -25,6 +25,7 @@ import publicRoutes from "./routes/public.routes.js";
 import userRoutes from "./routes/user.routes.js";
 import missionRoutes from "./routes/mission.routes.js";
 import deviceRoutes from "./routes/device.routes.js";
+import nasaRoutes from "./routes/nasa.routes.js";
 import { successResponse } from "./utils/response.js";
 
 const app: Application = express();
@@ -120,6 +121,7 @@ app.use("/api/clinical-operations", clinicalOperationsRoutes);
 app.use("/api/alerts", alertRoutes);
 app.use("/api/upload", uploadRoutes);
 app.use("/api/devices", deviceRoutes);
+app.use("/api/nasa", nasaRoutes);
 
 // v1 compatibility routes (for requests hitting /api/v1/...)
 app.use("/api/v1/telemetry", telemetryRoutes);
@@ -130,6 +132,7 @@ app.use("/api/v1/admin", adminRoutes);
 app.use("/api/v1/public", publicRoutes);
 app.use("/api/v1/users", userRoutes);
 app.use("/api/v1/missions", missionRoutes);
+app.use("/api/v1/nasa", nasaRoutes);
 
 // Role-specific scoped APIs
 app.use("/api/medical", medicalRoutes);

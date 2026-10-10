@@ -47,13 +47,15 @@ backend/
 │   │   ├── astronaut.controller.ts   # Astronaut profile endpoints
 │   │   ├── health.controller.ts      # Telemetry ingestion & query
 │   │   ├── analysis.controller.ts    # AI Analysis triggers & queries
-│   │   └── alert.controller.ts       # Alert management & resolution
+│   │   ├── alert.controller.ts       # Alert management & resolution
+│   │   └── nasa.controller.ts        # NASA Open API DONKI & Space Weather
 │   │
 │   ├── routes/
 │   │   ├── astronaut.routes.ts       # /api/astronauts
 │   │   ├── health.routes.ts          # /api/health
 │   │   ├── analysis.routes.ts        # /api/analysis
-│   │   └── alert.routes.ts           # /api/alerts
+│   │   ├── alert.routes.ts           # /api/alerts
+│   │   └── nasa.routes.ts            # /api/nasa (Space weather, radiation, APOD)
 │   │
 │   ├── models/
 │   │   ├── Astronaut.ts              # Astronaut schema & interface
@@ -65,6 +67,7 @@ backend/
 │   │   ├── health.service.ts         # Ingestion orchestration pipeline
 │   │   ├── analysis.service.ts       # Baseline deviation & explainability
 │   │   ├── alert.service.ts          # Alert generation & resolution
+│   │   ├── nasa.service.ts           # NASA Open API DONKI & Space Weather client
 │   │   └── ml.service.ts             # HTTP client for Python ML engine
 │   │
 │   ├── middleware/

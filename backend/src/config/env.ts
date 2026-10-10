@@ -28,6 +28,7 @@ const envSchema = z.object({
   CLOUDINARY_API_KEY: z.string().optional().default(""),
   CLOUDINARY_API_SECRET: z.string().optional().default(""),
   CLOUDINARY_URL: z.string().optional().default(""),
+  NASA_API_KEY: z.string().default("DEMO_KEY"),
 }).superRefine((env, ctx) => {
   if (!env.MONGODB_URI.startsWith("mongodb://") && !env.MONGODB_URI.startsWith("mongodb+srv://")) {
     ctx.addIssue({

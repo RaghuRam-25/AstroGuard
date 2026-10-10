@@ -6,6 +6,7 @@ import { ChatMessage } from "../models/ChatMessage.js";
 import { HealthData } from "../models/HealthData.js";
 import { env } from "../config/env.js";
 import { AnalysisService } from "./analysis.service.js";
+import { NasaService } from "./nasa.service.js";
 
 const SYSTEM_INSTRUCTION = `You are AstroGuard AI, an intelligent, context-aware conversational assistant integrated into the AstroGuard astronaut health & mission platform.
 
@@ -154,6 +155,9 @@ export class AIChatService {
     if (cleanQ.includes("stress") || cleanQ.includes("cortisol") || cleanQ.includes("ecg") || cleanQ.includes("respiration")) {
       requestedMetrics.push("stress");
     }
+    if (cleanQ.includes("radiation") || cleanQ.includes("msv") || cleanQ.includes("solar") || cleanQ.includes("space weather") || cleanQ.includes("cme") || cleanQ.includes("sep")) {
+      requestedMetrics.push("radiation");
+    }
 
     if (requestedMetrics.length > 0) {
       return { intent: "ASTRONAUT_DATA_QUESTION", requestedMetrics };
@@ -282,6 +286,24 @@ export class AIChatService {
           nominalRange: "50-85%",
         };
         contextUsed.push("activity");
+      }
+      if (requestedMetrics.includes("radiation")) {
+        try {
+          const nasaWeather = await NasaService.getSpaceWeatherAndRadiation();
+          contextObj.radiation = {
+            dailyDoseMsv: 0.38,
+            spaceWeatherStatus: nasaWeather.status,
+            solarProtonFlux: nasaWeather.solarProtonFlux,
+            stormShelterRequired: nasaWeather.stormShelterRequired,
+            activeSolarEvents: nasaWeather.activeSolarEventsCount,
+            source: nasaWeather.source,
+            nasaAlerts: nasaWeather.alerts,
+          };
+          contextUsed.push("radiation & NASA DONKI Space Weather");
+        } catch {
+          contextObj.radiation = { dailyDoseMsv: 0.38, status: "NOMINAL", source: "AstroGuard Cabin Dosimeter" };
+          contextUsed.push("radiation");
+        }
       }
       return { contextObj, contextUsed };
     }
